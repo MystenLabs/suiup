@@ -45,6 +45,8 @@ use crate::types::InstalledBinaries;
 use crate::types::Release;
 use crate::types::Version;
 use crate::{GITHUB_REPO, RELEASES_ARCHIVES_FOLDER};
+use downloader::downloader::Builder;
+use downloader::Download;
 use std::cmp::min;
 use std::env;
 
@@ -861,6 +863,56 @@ async fn download_latest_release(network: &str) -> Result<String, anyhow::Error>
 }
 
 pub async fn download_file(url: &str, download_to: &PathBuf, name: &str) -> Result<String, Error> {
+    let client = Client::new();
+    let response = client.get(url).header("User-Agent", "suiup").send().await?;
+
+    let response = response.error_for_status();
+
+    if let Err(ref e) = response {
+        bail!("Encountered unexpected error: {e}");
+    }
+
+    let response = response.unwrap();
+
+    if !response.status().is_success() {
+        return Err(anyhow!("Failed to download: {}", response.status()));
+    }
+
+    let mut total_size = response.content_length().unwrap_or_else(|| 0);
+    //walrus is on google storage, so different content length header
+    if total_size == 0 {
+        total_size = response
+            .headers()
+            .get("x-goog-stored-content-length")
+            .and_then(|c| c.to_str().ok())
+            .and_then(|c| c.parse::<u64>().ok())
+            .unwrap_or(0);
+    }
+
+    if download_to.exists() {
+        if download_to.metadata()?.len() == total_size {
+            println!("Found {name} in cache");
+            return Ok(name.to_string());
+        } else {
+            std::fs::remove_file(&download_to)?;
+        }
+    }
+
+    let mut dl = Builder::default()
+        .download_folder(download_to.parent().unwrap())
+        .build()
+        .unwrap();
+
+    let response = dl.async_download(&[Download::new(url)]).await;
+    // response.iter().for_each(|v| match v {
+    //     Ok(v) => println!("Downloaded: {:?}", v),
+    //     Err(e) => println!("Error: {:?}", e),
+    // });
+
+    Ok(name.to_string())
+}
+
+pub async fn download_file1(url: &str, download_to: &PathBuf, name: &str) -> Result<String, Error> {
     let client = Client::new();
     let response = client.get(url).header("User-Agent", "suiup").send().await?;
 

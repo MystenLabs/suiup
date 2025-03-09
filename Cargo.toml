@@ -9,6 +9,7 @@ clap = { version = "4.5", features = ["derive"] }
 clap_complete = "4.5.40"
 console = { version = "0.15.8", features = ["windows-console-colors"] }
 dirs = "6.0.0"
+downloader = { version = "0.2.8", features = ["indicatif", "rustls-tls"] }
 flate2 = "1.0.31"
 futures-util = "0.3.30"
 indicatif = "0.17"
