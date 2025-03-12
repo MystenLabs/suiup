@@ -107,14 +107,14 @@ mod tests {
             );
         }
 
-        let final_output = format!("{}\n{}", combined_output, combined_error);
+        let snapshot_text = format!("{}\n{}", combined_output, combined_error);
 
         let mut settings = insta::Settings::clone_current();
         for r in redact {
             settings.add_redaction(r.0, r.1);
         }
         let _guard = settings.bind_to_scope();
-        final_output
+        snapshot_text
     }
 
     #[tokio::test]
@@ -122,7 +122,7 @@ mod tests {
         let test_env = TestEnv::new()?;
         test_env.initialize_paths()?;
 
-        let final_output = run_commands(
+        let snapshot_text = run_commands(
             vec![
                 "suiup install sui testnet-v1.40.1 --nightly", // NOT OK: nightly + version specified
                 "suiup install mvr --debug",                   // NOT OK: !sui + debug
@@ -136,7 +136,7 @@ mod tests {
             &mut String::new(),
             &mut String::new(),
         );
-        assert_snapshot!(final_output);
+        assert_snapshot!(snapshot_text);
 
         Ok(())
     }
@@ -202,7 +202,7 @@ mod tests {
         let default_sui_binary = "sui";
 
         // Run commands
-        let final_output = run_commands(
+        let snapshot_text = run_commands(
             vec![
                 "suiup install mvr --debug -y",
                 "suiup install sui testnet-v1.39.3 --debug -y",
@@ -218,7 +218,7 @@ mod tests {
             &mut String::new(),
         );
 
-        assert_snapshot!(final_output);
+        assert_snapshot!(snapshot_text);
 
         // Verify binary exists in correct location
         #[cfg(windows)]
@@ -250,7 +250,7 @@ mod tests {
         let default_mvr_binary = "mvr";
 
         // Run commands
-        let final_output = run_commands(
+        let snapshot_text = run_commands(
             vec![
                 "suiup install mvr v0.0.4 -y",
                 "suiup update mvr -y",
@@ -262,7 +262,7 @@ mod tests {
             &mut combined_error,
         );
 
-        assert_snapshot!(final_output);
+        assert_snapshot!(snapshot_text);
 
         // Verify new version exists
         let binary_path = test_env.data_dir.join("suiup/binaries/standalone");
@@ -289,7 +289,7 @@ mod tests {
         let default_sui_binary = "sui";
 
         // Run commands
-        let final_output = run_commands(
+        let snapshot_text = run_commands(
             vec![
                 "suiup install sui testnet-v1.39.3 -y",
                 "suiup install sui testnet-v1.40.1 -y",
@@ -305,7 +305,7 @@ mod tests {
             &mut String::new(),
         );
 
-        assert_snapshot!(final_output);
+        assert_snapshot!(snapshot_text);
 
         Ok(())
     }

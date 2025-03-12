@@ -1,13 +1,13 @@
 ---
 source: tests/integration_test.rs
-expression: final_output
+expression: snapshot_text
 ---
 ====suiup install sui testnet-v1.40.1 --nightly ==== output
 ====suiup install mvr --debug ==== output
 ====suiup install mvr --nightly --debug ==== output
 Installing mvr from main branch
-Rust is installed: rustc 1.83.0 (90b35a623 2024-11-26)
-Cargo is installed: cargo 1.83.0 (5ffbef321 2024-10-29)
+Rust is installed: rustc 1.85.0 (4d91de4e4 2025-02-17)
+Cargo is installed: cargo 1.85.0 (d73d2caf9 2024-12-31)
 Installation completed successfully!
 Do you want to set this new installed version as the default one? [y/N] Keeping the current default version.
 
