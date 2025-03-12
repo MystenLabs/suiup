@@ -118,7 +118,14 @@ pub fn handle_default(cmd: DefaultCommands) -> Result<(), Error> {
             }
 
             #[cfg(target_os = "windows")]
-            src.set_extension("exe");
+            let filename = src.file_name().expect("Expected binary filename");
+            #[cfg(target_os = "windows")]
+            src.set_file_name(format!(
+                "{}.exe",
+                filename
+                    .to_str()
+                    .expect("Expected binary filename as string")
+            ));
 
             #[cfg(not(target_os = "windows"))]
             {

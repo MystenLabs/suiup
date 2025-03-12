@@ -73,6 +73,7 @@ impl TestEnv {
 
         // Store original env vars
         let vars_to_capture = vec![
+            "LOCALAPPDATA",
             "HOME",
             "XDG_DATA_HOME",
             "XDG_CONFIG_HOME",
@@ -86,12 +87,20 @@ impl TestEnv {
             .collect();
 
         // Set test env vars
+        #[cfg(windows)]
+        env::set_var("LOCALAPPDATA", &data_dir); // it is the same for data and config
+        #[cfg(not(windows))]
         env::set_var("XDG_DATA_HOME", &data_dir);
+        #[cfg(not(windows))]
         env::set_var("XDG_CONFIG_HOME", &config_dir);
+        #[cfg(not(windows))]
         env::set_var("XDG_CACHE_HOME", &cache_dir);
 
         // Add bin dir to PATH
         let path = env::var("PATH").unwrap_or_default();
+        #[cfg(windows)]
+        let new_path = format!("{};{}", bin_dir.display(), path);
+        #[cfg(not(windows))]
         let new_path = format!("{}:{}", bin_dir.display(), path);
         env::set_var("PATH", new_path);
 
