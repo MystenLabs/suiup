@@ -1,0 +1,18 @@
+---
+source: tests/integration_test.rs
+expression: final_output
+---
+====suiup install sui testnet-v1.40.1 --nightly ==== output
+====suiup install mvr --debug ==== output
+====suiup install mvr --nightly --debug ==== output
+Installing mvr from main branch
+Rust is installed: rustc 1.83.0 (90b35a623 2024-11-26)
+Cargo is installed: cargo 1.83.0 (5ffbef321 2024-10-29)
+Installation completed successfully!
+Do you want to set this new installed version as the default one? [y/N] Keeping the current default version.
+
+====suiup install sui testnet-v1.40.1 --nightly ==== error
+Error: Cannot install from nightly and a release at the same time. Remove the version or the nightly flag
+====suiup install mvr --debug ==== error
+Error: Debug flag is only available for the `sui` binary
+====suiup install mvr --nightly --debug ==== error

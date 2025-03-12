@@ -8,6 +8,7 @@ mod tests {
     use crate::test_utils::TestEnv;
     use anyhow::Result;
     use assert_cmd::Command;
+    use insta::assert_snapshot;
     use predicates::prelude::*;
     use suiup::paths::installed_binaries_file;
 
@@ -40,30 +41,102 @@ mod tests {
         cmd
     }
 
+    fn run_command(
+        command_name: &str,
+        args: Vec<&str>,
+        test_env: &TestEnv,
+        combined_output: &mut String,
+        combined_error: &mut String,
+    ) {
+        let mut cmd = if command_name == "suiup" {
+            Command::cargo_bin("suiup").unwrap()
+        } else {
+            Command::new(command_name)
+        };
+
+        cmd.args(args.clone());
+
+        cmd.env(DATA_HOME, &test_env.data_dir)
+            .env(CONFIG_HOME, &test_env.config_dir)
+            .env(CACHE_HOME, &test_env.cache_dir)
+            .env(HOME, &test_env.temp_dir.path())
+            .env("RUST_LOG", "off");
+
+        let output = cmd.output().expect(
+            format!(
+                "Failed to execute command {command_name} {}",
+                args.join(" ")
+            )
+            .as_str(),
+        );
+
+        let (output, error) = (
+            String::from_utf8_lossy(&output.stdout).to_string(),
+            String::from_utf8_lossy(&output.stderr).to_string(),
+        );
+
+        combined_output.push_str(&format!(
+            "===={} {} ==== output\n{}",
+            command_name,
+            args.join(" "),
+            &output
+        ));
+        combined_error.push_str(&format!(
+            "===={} {} ==== error\n{}",
+            command_name,
+            args.join(" "),
+            &error
+        ));
+    }
+
+    fn run_commands<'a>(
+        commands: Vec<&'a str>,
+        test_env: &TestEnv,
+        redact: Vec<(&'a str, &'a str)>,
+        combined_output: &'a mut String,
+        combined_error: &'a mut String,
+    ) -> String {
+        for (cmd) in commands {
+            let cmd: Vec<&str> = cmd.split_whitespace().collect();
+            run_command(
+                cmd[0],
+                cmd[1..].to_vec(),
+                test_env,
+                combined_output,
+                combined_error,
+            );
+        }
+
+        let final_output = format!("{}\n{}", combined_output, combined_error);
+
+        let mut settings = insta::Settings::clone_current();
+        for r in redact {
+            settings.add_redaction(r.0, r.1);
+        }
+        let _guard = settings.bind_to_scope();
+        final_output
+    }
+
     #[tokio::test]
     async fn test_install_flags() -> Result<()> {
         let test_env = TestEnv::new()?;
         test_env.initialize_paths()?;
 
-        // NOT OK: nightly + version specified
-        let mut cmd = suiup_command(
-            vec!["install", "sui", "testnet-v1.40.1", "--nightly"],
+        let final_output = run_commands(
+            vec![
+                "suiup install sui testnet-v1.40.1 --nightly", // NOT OK: nightly + version specified
+                "suiup install mvr --debug",                   // NOT OK: !sui + debug
+                "suiup install mvr --nightly --debug",         // OK: nightly + debug
+            ],
             &test_env,
+            vec![
+                (".exe", ""), // remove .exe from output to make it simple to have one snapshot
+                              // that also works on Windows
+            ],
+            &mut String::new(),
+            &mut String::new(),
         );
-        cmd.assert().failure().stderr(predicate::str::contains(
-            "Error: Cannot install from nightly and a release at the same time",
-        ));
-
-        // NOT OK: !sui + debug
-        let mut cmd = suiup_command(vec!["install", "mvr", "--debug"], &test_env);
-        cmd.assert().failure().stderr(predicate::str::contains(
-            "Error: Debug flag is only available for the `sui` binary",
-        ));
-
-        // OK: nightly + debug
-        // OK: nightly (if nightly + debug work, nightly works on its own too)
-        let mut cmd = suiup_command(vec!["install", "mvr", "--nightly", "--debug"], &test_env);
-        cmd.assert().success();
+        assert_snapshot!(final_output);
 
         Ok(())
     }
@@ -123,80 +196,73 @@ mod tests {
         test_env.initialize_paths()?;
         test_env.copy_testnet_releases_to_cache()?;
 
-        // Run install command
-        let mut cmd = suiup_command(vec!["install", "mvr", "--debug", "-y"], &test_env);
-        cmd.assert().failure().stderr(predicate::str::contains(
-            "Error: Debug flag is only available for the `sui` binary",
-        ));
+        #[cfg(windows)]
+        let default_sui_binary = "sui.exe";
+        #[cfg(not(windows))]
+        let default_sui_binary = "sui";
 
-        // Run install command
-        let mut cmd = suiup_command(
-            vec!["install", "sui", "testnet-v1.39.3", "--debug", "-y"],
+        // Run commands
+        let final_output = run_commands(
+            vec![
+                "suiup install mvr --debug -y",
+                "suiup install sui testnet-v1.39.3 --debug -y",
+                &format!("{} --version", default_sui_binary),
+                "suiup default get",
+            ],
             &test_env,
+            vec![
+                (".exe", ""), // remove .exe from output to make it simple to have one snapshot
+                              // that also works on Windows
+            ],
+            &mut String::new(),
+            &mut String::new(),
         );
 
-        #[cfg(windows)]
-        let assert_string = "'sui-debug.exe' extracted successfully!";
-        #[cfg(not(windows))]
-        let assert_string = "'sui-debug' extracted successfully!";
-
-        cmd.assert()
-            .success()
-            .stdout(predicate::str::contains(assert_string));
+        assert_snapshot!(final_output);
 
         // Verify binary exists in correct location
-        // TODO! For windows, the test environment variables are not respected
         #[cfg(windows)]
-        let binary_path = test_env
-            .data_dir
-            .join("suiup/binaries/testnet/sui-debug-v1.39.3.exe");
+        let binary_name = "sui-debug-v1.39.3.exe";
         #[cfg(not(windows))]
-        let binary_path = test_env
+        let binary_name = "sui-debug-v1.39.3";
+        assert!(test_env
             .data_dir
-            .join("suiup/binaries/testnet/sui-debug-v1.39.3");
-        assert!(binary_path.exists());
+            .join("suiup/binaries/testnet")
+            .join(binary_name)
+            .exists());
 
         // Verify default binary exists
-        // TODO! For windows, the test environment variables are not respected
-        #[cfg(windows)]
-        let default_sui_binary = test_env.bin_dir.join("sui.exe");
-        #[cfg(not(windows))]
-        let default_sui_binary = test_env.bin_dir.join("sui");
-        assert!(default_sui_binary.exists());
-
-        // Test binary execution
-        // on windows this fails due to being a debug binary
-        // thread \'main\' has overflowed its stack
-        #[cfg(not(windows))]
-        {
-            let mut cmd = Command::new(default_sui_binary);
-            cmd.arg("--version");
-            cmd.assert()
-                .success()
-                .stdout(predicate::str::contains("1.39.3"));
-        }
-
-        let mut cmd = Command::cargo_bin("suiup")?;
-        cmd.arg("default").arg("get");
-        cmd.assert()
-            .success()
-            .stdout(predicate::str::contains("sui-v1.39.3 (debug build)"));
+        assert!(test_env.bin_dir.join(default_sui_binary).exists());
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn test_update_workflow() -> Result<()> {
+    async fn test_update_mvr_workflow() -> Result<()> {
         let test_env = TestEnv::new()?;
         test_env.initialize_paths()?;
+        let mut combined_output = String::new();
+        let mut combined_error = String::new();
 
-        // Install older version
-        let mut cmd = suiup_command(vec!["install", "mvr", "v0.0.4", "-y"], &test_env);
-        cmd.assert().success();
+        #[cfg(windows)]
+        let default_mvr_binary = "mvr.exe";
+        #[cfg(not(windows))]
+        let default_mvr_binary = "mvr";
 
-        // Run update
-        let mut cmd = suiup_command(vec!["update", "mvr", "-y"], &test_env);
-        cmd.assert().success();
+        // Run commands
+        let final_output = run_commands(
+            vec![
+                "suiup install mvr v0.0.4 -y",
+                "suiup update mvr -y",
+                &format!("{} {}", default_mvr_binary, "--version"),
+            ],
+            &test_env,
+            vec![(".exe", "")],
+            &mut combined_output,
+            &mut combined_error,
+        );
+
+        assert_snapshot!(final_output);
 
         // Verify new version exists
         let binary_path = test_env.data_dir.join("suiup/binaries/standalone");
@@ -206,16 +272,7 @@ mod tests {
         assert!(num_files.len() >= 1);
 
         // Verify default binary exists
-        #[cfg(windows)]
-        let default_mvr_binary = test_env.bin_dir.join("mvr.exe");
-        #[cfg(not(windows))]
-        let default_mvr_binary = test_env.bin_dir.join("mvr");
-        assert!(default_mvr_binary.exists());
-
-        // Test binary execution
-        let mut cmd = Command::new(default_mvr_binary);
-        cmd.arg("--version");
-        cmd.assert().success();
+        assert!(test_env.bin_dir.join(default_mvr_binary).exists());
 
         Ok(())
     }
@@ -226,52 +283,29 @@ mod tests {
         test_env.initialize_paths()?;
         test_env.copy_testnet_releases_to_cache()?;
 
-        // Install 1.39.3
-        let mut cmd = suiup_command(vec!["install", "sui", "testnet-v1.39.3", "-y"], &test_env);
         #[cfg(windows)]
-        let assert_string = "'sui.exe' extracted successfully!";
+        let default_sui_binary = "sui.exe";
         #[cfg(not(windows))]
-        let assert_string = "'sui' extracted successfully!";
-        cmd.assert()
-            .success()
-            .stdout(predicate::str::contains(assert_string));
-        println!("Here 1");
-        // Test binary execution
-        #[cfg(windows)]
-        let default_sui_binary = test_env.bin_dir.join("sui.exe");
-        #[cfg(not(windows))]
-        let default_sui_binary = test_env.bin_dir.join("sui");
-        let mut cmd = Command::new(&default_sui_binary);
-        cmd.arg("--version");
-        cmd.assert()
-            .success()
-            .stdout(predicate::str::contains("1.39.3"));
+        let default_sui_binary = "sui";
 
-        println!("Here 2");
-        // Install 1.40.1
-        let mut cmd = suiup_command(vec!["install", "sui", "testnet-v1.40.1", "-y"], &test_env);
-        cmd.assert()
-            .success()
-            .stdout(predicate::str::contains(assert_string));
-        println!("Here 3");
-        // Test binary execution
-        let mut cmd = Command::new(&default_sui_binary);
-        cmd.arg("--version");
-        cmd.assert()
-            .success()
-            .stdout(predicate::str::contains("1.40.1"));
+        // Run commands
+        let final_output = run_commands(
+            vec![
+                "suiup install sui testnet-v1.39.3 -y",
+                "suiup install sui testnet-v1.40.1 -y",
+                "suiup default set sui testnet-v1.39.3",
+                &format!("{} --version", default_sui_binary),
+            ],
+            &test_env,
+            vec![
+                (".exe", ""), // remove .exe from output to make it simple to have one snapshot
+                              // that also works on Windows
+            ],
+            &mut String::new(),
+            &mut String::new(),
+        );
 
-        println!("Here 4");
-        // Switch from 1.39.3 to 1.40.1
-
-        let mut cmd = suiup_command(vec!["default", "set", "sui", "testnet-v1.39.3"], &test_env);
-        cmd.assert().success();
-
-        let mut cmd = Command::new(default_sui_binary);
-        cmd.arg("--version");
-        cmd.assert()
-            .success()
-            .stdout(predicate::str::contains("1.39.3"));
+        assert_snapshot!(final_output);
 
         Ok(())
     }

@@ -1,0 +1,20 @@
+---
+source: tests/integration_test.rs
+expression: final_output
+---
+====suiup install mvr v0.0.4 -y ==== output
+Adding binary: mvr-v0.0.4
+Setting mvr as default
+[standalone] mvr-v0.0.4 set as default
+====suiup update mvr -y ==== output
+Downloading release list
+No version specified. Downloading latest release: v0.0.8
+Adding binary: mvr-v0.0.8
+Setting mvr as default
+[standalone] mvr-v0.0.8 set as default
+====mvr --version ==== output
+mvr 0.0.8-b35de6faa641
+
+====suiup install mvr v0.0.4 -y ==== error
+====suiup update mvr -y ==== error
+====mvr --version ==== error

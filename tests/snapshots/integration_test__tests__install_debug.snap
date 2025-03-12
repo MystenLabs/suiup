@@ -1,0 +1,26 @@
+---
+source: tests/integration_test.rs
+expression: final_output
+---
+====suiup install mvr --debug -y ==== output
+====suiup install sui testnet-v1.39.3 --debug -y ==== output
+Searching for release with tag: testnet-v1.39.3...
+Saving releases list to cache
+Adding binary: sui-v1.39.3
+Extracting file: sui-debug
+ 'sui-debug' extracted successfully!
+Setting sui as default
+[testnet] sui-v1.39.3 set as default
+====sui --version ==== output
+sui 1.39.3-5d4350d66d2b
+====suiup default get ==== output
+[1mDefault binaries:[0m
+[testnet release/branch]
+    sui-v1.39.3 (debug build)
+
+
+====suiup install mvr --debug -y ==== error
+Error: Debug flag is only available for the `sui` binary
+====suiup install sui testnet-v1.39.3 --debug -y ==== error
+====sui --version ==== error
+====suiup default get ==== error

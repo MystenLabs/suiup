@@ -1,0 +1,28 @@
+---
+source: tests/integration_test.rs
+expression: final_output
+---
+====suiup install sui testnet-v1.39.3 -y ==== output
+Searching for release with tag: testnet-v1.39.3...
+Saving releases list to cache
+Adding binary: sui-v1.39.3
+Extracting file: sui
+ 'sui' extracted successfully!
+Setting sui as default
+[testnet] sui-v1.39.3 set as default
+====suiup install sui testnet-v1.40.1 -y ==== output
+Searching for release with tag: testnet-v1.40.1...
+Adding binary: sui-v1.40.1
+Extracting file: sui
+ 'sui' extracted successfully!
+Setting sui as default
+[testnet] sui-v1.40.1 set as default
+====suiup default set sui testnet-v1.39.3 ==== output
+Default binary updated successfully
+====sui --version ==== output
+sui 1.39.3-5d4350d66d2b
+
+====suiup install sui testnet-v1.39.3 -y ==== error
+====suiup install sui testnet-v1.40.1 -y ==== error
+====suiup default set sui testnet-v1.39.3 ==== error
+====sui --version ==== error

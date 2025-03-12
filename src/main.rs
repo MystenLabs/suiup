@@ -25,6 +25,8 @@ async fn main() -> Result<(), Error> {
     let args = Suiup::parse();
     let github_token = args.github_token.clone();
 
+    tracing_subscriber::fmt::init();
+
     match args.command {
         Commands::Default(cmd) => handle_default(cmd)?,
         Commands::Install {

@@ -128,7 +128,7 @@ pub fn update_after_install(
                 #[cfg(target_os = "windows")]
                 let filename = format!("{}.exe", filename);
 
-                println!(
+                tracing::info!(
                     "Installing binary to {}/{}",
                     binary_folder.display(),
                     filename

@@ -29,7 +29,7 @@ pub fn detect_os_arch() -> Result<(String, String), Error> {
         _ => anyhow::bail!("Unsupported architecture. Supported only: x86_64, aarch64"),
     };
 
-    println!("Detected: {os}-{arch}...");
+    tracing::info!("Detected: {os}-{arch}...");
     Ok((os.to_string(), arch.to_string()))
 }
 
@@ -148,7 +148,7 @@ pub async fn download_file(
 
     if download_to.exists() {
         if download_to.metadata()?.len() == total_size {
-            println!("Found {name} in cache");
+            tracing::info!("Found {name} in cache");
             return Ok(name.to_string());
         } else {
             std::fs::remove_file(download_to)?;
