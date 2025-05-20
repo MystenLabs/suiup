@@ -13,8 +13,8 @@ RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
-echo -e "${CYAN}suiup installer script${NC}"
-echo "This script will install the suiup binary to your system."
+printf "${CYAN}suiup installer script${NC}\n"
+printf "This script will install the suiup binary to your system.\n"
 
 # Get latest version from GitHub
 get_latest_version() {
@@ -122,20 +122,20 @@ check_path() {
     fi
     
     if [[ ":$PATH:" != *":$dir:"* ]]; then
-        echo -e "${YELLOW}Warning: $dir is not in your PATH${NC}"
+        printf "${YELLOW}Warning: $dir is not in your PATH${NC}\n"
         
         # Provide instructions based on OS
         if [ "$os" = "macos" ] || [ "$os" = "linux" ]; then
-            echo "Add the following to your shell profile (~/.bashrc, ~/.zshrc, etc.):"
-            echo -e "${GREEN}export PATH=\"$dir:\$PATH\"${NC}"
+            printf "Add the following to your shell profile (~/.bashrc, ~/.zshrc, etc.):\n"
+            printf "${GREEN}export PATH=\"$dir:\$PATH\"${NC}\n"
         elif [ "$os" = "windows" ]; then
-            echo "Add this directory to your PATH by running this in PowerShell:"
-            echo -e "${GREEN}\$env:Path += \"$separator$dir\"${NC}"
-            echo "To make it permanent, add it through Windows System Properties:"
-            echo "Control Panel → System → Advanced system settings → Environment Variables"
+            printf "Add this directory to your PATH by running this in PowerShell:\n"
+            printf "${GREEN}\$env:Path += \"$separator$dir\"${NC}\n"
+            printf "To make it permanent, add it through Windows System Properties:\n"
+            printf "Control Panel → System → Advanced system settings → Environment Variables\n"
         fi
     else
-        echo -e "${GREEN}$dir is already in your PATH${NC}"
+        printf "${GREEN}$dir is already in your PATH${NC}\n"
     fi
 }
 
@@ -177,21 +177,21 @@ install_suiup() {
     local version=$(get_latest_version)
     
     if [ -z "$version" ]; then
-        echo -e "${RED}Error: Could not fetch latest version${NC}"
+        printf "${RED}Error: Could not fetch latest version${NC}\n"
         exit 1
     fi
     
     local download_url=$(get_download_url "$os" "$arch" "$version")
     
     if [ -z "$download_url" ]; then
-        echo -e "${RED}Error: Unsupported OS or architecture: $os/$arch${NC}"
+        printf "${RED}Error: Unsupported OS or architecture: $os/$arch${NC}\n"
         exit 1
     fi
     
-    echo "Detected OS: $os"
-    echo "Detected architecture: $arch"
-    echo "Latest version: $version"
-    echo "Download URL: $download_url"
+    printf "Detected OS: $os\n"
+    printf "Detected architecture: $arch\n"
+    printf "Latest version: $version\n"
+    printf "Download URL: $download_url\n"
     
     # Create temporary directory
     local tmp_dir=$(mktemp -d)
@@ -203,9 +203,9 @@ install_suiup() {
     download_file "$download_url" "$binary_file"
     
     # Extract the binary
-    echo "Extracting binary..."
+    printf "Extracting binary...\n"
     if [ "$os" = "windows" ]; then
-        echo "No extraction needed for Windows binaries."
+        printf "No extraction needed for Windows binaries.\n"
     else
         tar -xzf "$binary_file" -C "$tmp_dir"
     fi
@@ -217,7 +217,7 @@ install_suiup() {
         installed_path="$install_dir/suiup.exe"
     fi
     
-    echo "Installing to $installed_path..."
+    printf "Installing to $installed_path...\n"
     
     # Ensure install directory exists
     mkdir -p "$install_dir"
@@ -225,14 +225,14 @@ install_suiup() {
     # Move binary to install directory
     mv "$tmp_dir/suiup" "$installed_path"
     
-    echo -e "${GREEN}Successfully installed suiup to $installed_path${NC}"
+    printf "${GREEN}Successfully installed suiup to $installed_path${NC}\n"
     
     # Check PATH
     check_path "$install_dir" "$os"
     
-    echo ""
-    echo -e "You can now run ${CYAN}suiup --help${NC} to get started."
-    echo "For more information, visit: https://github.com/$GITHUB_REPO"
+    printf "\n"
+    printf "You can now run ${CYAN}suiup --help${NC} to get started.\n"
+    printf "For more information, visit: https://github.com/$GITHUB_REPO\n"
 }
 
 # Run the installer
