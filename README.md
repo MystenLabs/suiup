@@ -1,5 +1,5 @@
 > [!CAUTION]
-> Highly experimental, use at your own risk. Not recommended for production use. No warranty is provided and we are not liable for any issues.
+> Highly experimental, use at your own risk. Not recommended for production use. This software is provided as is.
 
 # Overview
 `suiup` is a tool to install and manage different versions of CLI tools for working in the Sui ecosystem. It allows you to easily install and switch between different versions of `sui`, `mvr`, `walrus`.
