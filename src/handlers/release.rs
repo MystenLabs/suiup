@@ -27,7 +27,7 @@ pub async fn release_list(
     }
 
     // Add ETag for caching
-    if let Ok(etag) = read_etag_file(&repo) {
+    if let Ok(etag) = read_etag_file(repo) {
         request = request.header(IF_NONE_MATCH, etag);
     }
 
@@ -38,7 +38,7 @@ pub async fn release_list(
     // note this only works with authenticated requests. Should add support for that later.
     if response.status() == reqwest::StatusCode::NOT_MODIFIED {
         // If nothing has changed, return an empty list and the existing ETag
-        if let Some((releases, etag)) = load_cached_release_list(&repo)
+        if let Some((releases, etag)) = load_cached_release_list(repo)
             .map_err(|e| anyhow!("Cannot load release list from cache: {e}"))?
         {
             return Ok((releases, Some(etag)));
@@ -55,7 +55,7 @@ pub async fn release_list(
         bail!("Response error: {e}");
     }
     let releases: Vec<Release> = response.unwrap().json()?;
-    save_release_list(&repo, &releases, etag.clone())?;
+    save_release_list(repo, &releases, etag.clone())?;
 
     Ok((releases, etag))
 }
