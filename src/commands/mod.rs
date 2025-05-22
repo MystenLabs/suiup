@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod default;
+mod install;
 
 use anyhow::{anyhow, bail, Result};
 use clap::{Parser, Subcommand, ValueEnum};
@@ -26,32 +27,7 @@ pub struct Command {
 #[derive(Subcommand)]
 pub enum Commands {
     Default(default::Command),
-    #[command(about = "Install a binary")]
-    Install {
-        #[arg(
-            help = "Binary to install with optional version (e.g. 'sui', 'sui@1.40.1', 'sui@testnet', 'sui@testnet-1.39.3')"
-        )]
-        component: String,
-        #[arg(
-            long,
-            required = false,
-            value_name = "branch",
-            default_missing_value = "main",
-            num_args = 0..=1,
-            help = "Install from a branch in release mode (use --debug for debug mode). \
-            If none provided, main is used. Note that this requires Rust & cargo to be installed."
-        )]
-        nightly: Option<String>,
-        #[arg(
-            long,
-            help = "This flag can be used in two ways: 1) to install the debug version of the \
-            binary (only available for sui, default is false; 2) together with `--nightly` \
-            to specify to install from branch in debug mode!"
-        )]
-        debug: bool,
-        #[arg(short, long, help = "Accept defaults without prompting")]
-        yes: bool,
-    },
+    Install(install::Command),
     #[command(about = "Remove one or more binaries")]
     Remove {
         #[arg(value_enum)]
@@ -79,23 +55,7 @@ impl Command {
     pub async fn exec(&self) -> Result<()> {
         match &self.command {
             Commands::Default(cmd) => cmd.exec(),
-            Commands::Install {
-                component,
-                nightly,
-                debug,
-                yes,
-            } => {
-                handle_cmd(
-                    ComponentCommands::Add {
-                        component: component.to_owned(),
-                        nightly: nightly.to_owned(),
-                        debug: debug.to_owned(),
-                        yes: yes.to_owned(),
-                    },
-                    self.github_token.to_owned(),
-                )
-                .await
-            }
+            Commands::Install(cmd) => cmd.exec(&self.github_token).await,
             Commands::Remove { binary } => {
                 handle_cmd(
                     ComponentCommands::Remove {
