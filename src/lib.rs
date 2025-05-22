@@ -4,7 +4,6 @@
 pub mod commands;
 pub mod handle_commands;
 pub mod handlers;
+pub mod mvr;
 pub mod paths;
 pub mod types;
-
-pub mod mvr;
