@@ -6,11 +6,12 @@ mod install;
 mod list;
 mod remove;
 mod show;
+mod update;
 
 use anyhow::{anyhow, bail, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 
-use crate::handlers::{update::handle_update, which::handle_which};
+use crate::handlers::which::handle_which;
 
 #[derive(Parser)]
 #[command(arg_required_else_help = true, disable_help_subcommand = true)]
@@ -31,16 +32,7 @@ pub enum Commands {
     Remove(remove::Command),
     List(list::Command),
     Show(show::Command),
-    #[command(about = "Update binary")]
-    Update {
-        #[arg(
-            help = "Binary to update (e.g. 'sui', 'mvr', 'walrus'). By default, it will update the default \
-            binary version. For updating a specific release, use the `sui@testnet` form."
-        )]
-        name: String,
-        #[arg(short, long, help = "Accept defaults without prompting")]
-        yes: bool,
-    },
+    Update(update::Command),
     #[command(about = "Show the path where default binaries are installed")]
     Which,
 }
@@ -53,14 +45,7 @@ impl Command {
             Commands::Remove(cmd) => cmd.exec(&self.github_token).await,
             Commands::List(cmd) => cmd.exec(&self.github_token).await,
             Commands::Show(cmd) => cmd.exec(),
-            Commands::Update { name, yes } => {
-                handle_update(
-                    name.to_owned(),
-                    yes.to_owned(),
-                    self.github_token.to_owned(),
-                )
-                .await
-            }
+            Commands::Update(cmd) => cmd.exec(&self.github_token).await,
             Commands::Which => handle_which(),
         }
     }
