@@ -1,29 +1,31 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, bail, Error};
+mod default;
+
+use anyhow::{anyhow, bail, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 
-#[derive(Parser)]
-#[command(name = "suiup")]
-#[command(about = "Sui Tooling Version Manager.")]
-pub(crate) struct Suiup {
-    #[command(subcommand)]
-    pub command: Commands,
+use crate::{
+    handle_commands::handle_cmd,
+    handlers::{show::handle_show, update::handle_update, which::handle_which},
+};
 
-    #[arg(
-        long = "github-token",
-        help = "GitHub API token for authenticated requests (helps avoid rate limits)",
-        env = "GITHUB_TOKEN",
-        global = true
-    )]
+#[derive(Parser)]
+#[command(arg_required_else_help = true, disable_help_subcommand = true)]
+#[command(version, about)]
+pub struct Command {
+    #[command(subcommand)]
+    command: Commands,
+
+    /// GitHub API token for authenticated requests (helps avoid rate limits).
+    #[arg(long, env = "GITHUB_TOKEN", global = true)]
     pub github_token: Option<String>,
 }
 
 #[derive(Subcommand)]
 pub enum Commands {
-    #[command(subcommand, about = "Get or set the default tool version")]
-    Default(DefaultCommands),
+    Default(default::Command),
     #[command(about = "Install a binary")]
     Install {
         #[arg(
@@ -73,6 +75,53 @@ pub enum Commands {
     Which,
 }
 
+impl Command {
+    pub async fn exec(&self) -> Result<()> {
+        match &self.command {
+            Commands::Default(cmd) => cmd.exec(),
+            Commands::Install {
+                component,
+                nightly,
+                debug,
+                yes,
+            } => {
+                handle_cmd(
+                    ComponentCommands::Add {
+                        component: component.to_owned(),
+                        nightly: nightly.to_owned(),
+                        debug: debug.to_owned(),
+                        yes: yes.to_owned(),
+                    },
+                    self.github_token.to_owned(),
+                )
+                .await
+            }
+            Commands::Remove { binary } => {
+                handle_cmd(
+                    ComponentCommands::Remove {
+                        binary: binary.to_owned(),
+                    },
+                    self.github_token.to_owned(),
+                )
+                .await
+            }
+            Commands::List => {
+                handle_cmd(ComponentCommands::List, self.github_token.to_owned()).await
+            }
+            Commands::Show => handle_show(),
+            Commands::Update { name, yes } => {
+                handle_update(
+                    name.to_owned(),
+                    yes.to_owned(),
+                    self.github_token.to_owned(),
+                )
+                .await
+            }
+            Commands::Which => handle_which(),
+        }
+    }
+}
+
 #[derive(Subcommand)]
 pub enum ComponentCommands {
     #[command(about = "List available binaries to install")]
@@ -107,34 +156,6 @@ pub enum ComponentCommands {
     Remove {
         #[arg(value_enum)]
         binary: BinaryName,
-    },
-}
-
-#[derive(Debug, Subcommand)]
-pub enum DefaultCommands {
-    #[command(about = "Get the default Sui CLI version")]
-    Get,
-    #[command(about = "Set the default Sui CLI version")]
-    Set {
-        #[arg(
-            help = "Binary to be set as default and the version (e.g. 'sui@testnet-1.39.3', 'sui@testnet' -- this will use an installed binary that has the highest testnet version)"
-        )]
-        name: String,
-        #[arg(
-            long,
-            help = "Whether to set the debug version of the binary as default (only available for sui)."
-        )]
-        debug: bool,
-
-        #[arg(
-            long,
-            required = false,
-            value_name = "branch",
-            default_missing_value = "main",
-            num_args = 0..=1,
-            help = "Use the nightly version by optionally specifying the branch name (uses main by default). Use `suiup show` to find all installed binaries"
-        )]
-        nightly: Option<String>,
     },
 }
 
@@ -238,7 +259,7 @@ pub fn parse_component_with_version(s: &str) -> Result<CommandMetadata, anyhow::
     }
 }
 
-pub fn parse_version_spec(spec: Option<String>) -> Result<(String, Option<String>), Error> {
+pub fn parse_version_spec(spec: Option<String>) -> Result<(String, Option<String>)> {
     match spec {
         None => Ok(("testnet".to_string(), None)),
         Some(spec) => {
