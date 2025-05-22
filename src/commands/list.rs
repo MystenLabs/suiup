@@ -6,14 +6,11 @@ use clap::Args;
 
 use crate::handle_commands::handle_cmd;
 
-use super::{BinaryName, ComponentCommands};
+use super::ComponentCommands;
 
 /// List available binaries to install.
 #[derive(Args, Debug)]
-pub struct Command {
-    #[arg(value_enum)]
-    binary: BinaryName,
-}
+pub struct Command;
 
 impl Command {
     pub async fn exec(&self, github_token: &Option<String>) -> Result<()> {

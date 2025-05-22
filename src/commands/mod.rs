@@ -5,11 +5,12 @@ mod default;
 mod install;
 mod list;
 mod remove;
+mod show;
 
 use anyhow::{anyhow, bail, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 
-use crate::handlers::{show::handle_show, update::handle_update, which::handle_which};
+use crate::handlers::{update::handle_update, which::handle_which};
 
 #[derive(Parser)]
 #[command(arg_required_else_help = true, disable_help_subcommand = true)]
@@ -29,8 +30,7 @@ pub enum Commands {
     Install(install::Command),
     Remove(remove::Command),
     List(list::Command),
-    #[command(about = "Show installed and active binaries")]
-    Show,
+    Show(show::Command),
     #[command(about = "Update binary")]
     Update {
         #[arg(
@@ -52,7 +52,7 @@ impl Command {
             Commands::Install(cmd) => cmd.exec(&self.github_token).await,
             Commands::Remove(cmd) => cmd.exec(&self.github_token).await,
             Commands::List(cmd) => cmd.exec(&self.github_token).await,
-            Commands::Show => handle_show(),
+            Commands::Show(cmd) => cmd.exec(),
             Commands::Update { name, yes } => {
                 handle_update(
                     name.to_owned(),
