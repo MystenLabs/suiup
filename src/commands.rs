@@ -7,6 +7,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 #[derive(Parser)]
 #[command(name = "suiup")]
 #[command(about = "Sui Tooling Version Manager.")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 pub(crate) struct Suiup {
     #[command(subcommand)]
     pub command: Commands,
@@ -57,6 +58,8 @@ pub enum Commands {
     },
     #[command(about = "List available binaries to install")]
     List,
+    #[command(subcommand, about = "Commands for suiup itself", name = "self")]
+    Self_(SelfCommands),
     #[command(about = "Show installed and active binaries")]
     Show,
     #[command(about = "Update binary")]
@@ -147,6 +150,14 @@ pub enum BinaryName {
     Walrus,
     #[value(name = "mvr")]
     Mvr,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SelfCommands {
+    #[command(about = "Update suiup itself")]
+    Update,
+    #[command(about = "Uninstall suiup")]
+    Uninstall,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
