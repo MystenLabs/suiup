@@ -7,11 +7,10 @@ mod list;
 mod remove;
 mod show;
 mod update;
+mod which;
 
 use anyhow::{anyhow, bail, Result};
 use clap::{Parser, Subcommand, ValueEnum};
-
-use crate::handlers::which::handle_which;
 
 #[derive(Parser)]
 #[command(arg_required_else_help = true, disable_help_subcommand = true)]
@@ -33,8 +32,7 @@ pub enum Commands {
     List(list::Command),
     Show(show::Command),
     Update(update::Command),
-    #[command(about = "Show the path where default binaries are installed")]
-    Which,
+    Which(which::Command),
 }
 
 impl Command {
@@ -46,7 +44,7 @@ impl Command {
             Commands::List(cmd) => cmd.exec(&self.github_token).await,
             Commands::Show(cmd) => cmd.exec(),
             Commands::Update(cmd) => cmd.exec(&self.github_token).await,
-            Commands::Which => handle_which(),
+            Commands::Which(cmd) => cmd.exec(),
         }
     }
 }
