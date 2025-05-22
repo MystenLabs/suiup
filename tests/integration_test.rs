@@ -187,6 +187,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_workflow() -> Result<()> {
+        if cfg!(windows) {
+            eprintln!("Skipped: mvr is not supported on Windows");
+            return Ok(());
+        }
+
         let test_env = TestEnv::new()?;
         test_env.initialize_paths()?;
 
@@ -273,6 +278,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_default_mvr_workflow() -> Result<(), anyhow::Error> {
+        if cfg!(windows) {
+            eprintln!("Skipped: mvr is not supported on Windows");
+            return Ok(());
+        }
+
         let test_env = TestEnv::new()?;
         test_env.initialize_paths()?;
 
