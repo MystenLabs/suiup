@@ -4,7 +4,7 @@ version = "0.0.1"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.86"
+anyhow = "1.0.98"
 clap = { version = "4.5", features = ["derive", "env"] }
 clap_complete = "4.5.40"
 console = { version = "0.15.8", features = ["windows-console-colors"] }
