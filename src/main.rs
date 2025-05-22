@@ -2,16 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use clap::Parser;
-
-mod commands;
-mod handle_commands;
-mod handlers;
-mod mvr;
-mod paths;
-mod types;
-
-use commands::Command;
-use paths::*;
+use suiup::commands::Command;
+use suiup::paths::initialize;
 use tracing::error;
 
 #[tokio::main]

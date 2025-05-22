@@ -205,3 +205,13 @@ pub fn parse_version_spec(spec: Option<String>) -> Result<(String, Option<String
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use clap::CommandFactory;
+
+    #[test]
+    fn verify_command() {
+        super::Command::command().debug_assert();
+    }
+}
