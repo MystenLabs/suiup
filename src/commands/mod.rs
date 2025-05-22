@@ -3,6 +3,7 @@
 
 mod default;
 mod install;
+mod remove;
 
 use anyhow::{anyhow, bail, Result};
 use clap::{Parser, Subcommand, ValueEnum};
@@ -28,11 +29,7 @@ pub struct Command {
 pub enum Commands {
     Default(default::Command),
     Install(install::Command),
-    #[command(about = "Remove one or more binaries")]
-    Remove {
-        #[arg(value_enum)]
-        binary: BinaryName,
-    },
+    Remove(remove::Command),
     #[command(about = "List available binaries to install")]
     List,
     #[command(about = "Show installed and active binaries")]
@@ -56,15 +53,7 @@ impl Command {
         match &self.command {
             Commands::Default(cmd) => cmd.exec(),
             Commands::Install(cmd) => cmd.exec(&self.github_token).await,
-            Commands::Remove { binary } => {
-                handle_cmd(
-                    ComponentCommands::Remove {
-                        binary: binary.to_owned(),
-                    },
-                    self.github_token.to_owned(),
-                )
-                .await
-            }
+            Commands::Remove(cmd) => cmd.exec(&self.github_token).await,
             Commands::List => {
                 handle_cmd(ComponentCommands::List, self.github_token.to_owned()).await
             }
