@@ -1,79 +1,52 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, bail, Error};
+mod default;
+mod install;
+mod list;
+mod remove;
+mod show;
+mod update;
+mod which;
+
+use anyhow::{anyhow, bail, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
-#[command(name = "suiup")]
-#[command(about = "Sui Tooling Version Manager.")]
-#[command(version = env!("CARGO_PKG_VERSION"))]
-pub(crate) struct Suiup {
+#[command(arg_required_else_help = true, disable_help_subcommand = true)]
+#[command(version, about)]
+pub struct Command {
     #[command(subcommand)]
-    pub command: Commands,
+    command: Commands,
 
-    #[arg(
-        long = "github-token",
-        help = "GitHub API token for authenticated requests (helps avoid rate limits)",
-        env = "GITHUB_TOKEN",
-        global = true
-    )]
+    /// GitHub API token for authenticated requests (helps avoid rate limits).
+    #[arg(long, env = "GITHUB_TOKEN", global = true)]
     pub github_token: Option<String>,
 }
 
 #[derive(Subcommand)]
 pub enum Commands {
-    #[command(subcommand, about = "Get or set the default tool version")]
-    Default(DefaultCommands),
-    #[command(about = "Install a binary")]
-    Install {
-        #[arg(
-            help = "Binary to install with optional version (e.g. 'sui', 'sui@1.40.1', 'sui@testnet', 'sui@testnet-1.39.3')"
-        )]
-        component: String,
-        #[arg(
-            long,
-            required = false,
-            value_name = "branch",
-            default_missing_value = "main",
-            num_args = 0..=1,
-            help = "Install from a branch in release mode (use --debug for debug mode). \
-            If none provided, main is used. Note that this requires Rust & cargo to be installed."
-        )]
-        nightly: Option<String>,
-        #[arg(
-            long,
-            help = "This flag can be used in two ways: 1) to install the debug version of the \
-            binary (only available for sui, default is false; 2) together with `--nightly` \
-            to specify to install from branch in debug mode!"
-        )]
-        debug: bool,
-        #[arg(short, long, help = "Accept defaults without prompting")]
-        yes: bool,
-    },
-    #[command(about = "Remove one or more binaries")]
-    Remove {
-        #[arg(value_enum)]
-        binary: BinaryName,
-    },
-    #[command(about = "List available binaries to install")]
-    List,
-    #[command(subcommand, about = "Commands for suiup itself", name = "self")]
-    Self_(SelfCommands),
-    #[command(about = "Show installed and active binaries")]
-    Show,
-    #[command(about = "Update binary")]
-    Update {
-        #[arg(
-            help = "Binary to update (e.g. 'sui', 'mvr', 'walrus'). By default, it will update the default \
-            binary version. For updating a specific release, use the `sui@testnet` form."
-        )]
-        name: String,
-        #[arg(short, long, help = "Accept defaults without prompting")]
-        yes: bool,
-    },
-    #[command(about = "Show the path where default binaries are installed")]
-    Which,
+    Default(default::Command),
+    Install(install::Command),
+    Remove(remove::Command),
+    List(list::Command),
+    Show(show::Command),
+    Update(update::Command),
+    Which(which::Command),
+}
+
+impl Command {
+    pub async fn exec(&self) -> Result<()> {
+        match &self.command {
+            Commands::Default(cmd) => cmd.exec(),
+            Commands::Install(cmd) => cmd.exec(&self.github_token).await,
+            Commands::Remove(cmd) => cmd.exec(&self.github_token).await,
+            Commands::List(cmd) => cmd.exec(&self.github_token).await,
+            Commands::Show(cmd) => cmd.exec(),
+            Commands::Update(cmd) => cmd.exec(&self.github_token).await,
+            Commands::Which(cmd) => cmd.exec(),
+        }
+    }
 }
 
 #[derive(Subcommand)]
@@ -110,34 +83,6 @@ pub enum ComponentCommands {
     Remove {
         #[arg(value_enum)]
         binary: BinaryName,
-    },
-}
-
-#[derive(Debug, Subcommand)]
-pub enum DefaultCommands {
-    #[command(about = "Get the default Sui CLI version")]
-    Get,
-    #[command(about = "Set the default Sui CLI version")]
-    Set {
-        #[arg(
-            help = "Binary to be set as default and the version (e.g. 'sui@testnet-1.39.3', 'sui@testnet' -- this will use an installed binary that has the highest testnet version)"
-        )]
-        name: String,
-        #[arg(
-            long,
-            help = "Whether to set the debug version of the binary as default (only available for sui)."
-        )]
-        debug: bool,
-
-        #[arg(
-            long,
-            required = false,
-            value_name = "branch",
-            default_missing_value = "main",
-            num_args = 0..=1,
-            help = "Use the nightly version by optionally specifying the branch name (uses main by default). Use `suiup show` to find all installed binaries"
-        )]
-        nightly: Option<String>,
     },
 }
 
@@ -249,7 +194,7 @@ pub fn parse_component_with_version(s: &str) -> Result<CommandMetadata, anyhow::
     }
 }
 
-pub fn parse_version_spec(spec: Option<String>) -> Result<(String, Option<String>), Error> {
+pub fn parse_version_spec(spec: Option<String>) -> Result<(String, Option<String>)> {
     match spec {
         None => Ok(("testnet".to_string(), None)),
         Some(spec) => {
@@ -266,5 +211,15 @@ pub fn parse_version_spec(spec: Option<String>) -> Result<(String, Option<String
                 Ok(("testnet".to_string(), Some(spec)))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::CommandFactory;
+
+    #[test]
+    fn verify_command() {
+        super::Command::command().debug_assert();
     }
 }
