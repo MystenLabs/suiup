@@ -5,6 +5,7 @@ mod default;
 mod install;
 mod list;
 mod remove;
+mod self_;
 mod show;
 mod update;
 mod which;
@@ -30,6 +31,10 @@ pub enum Commands {
     Install(install::Command),
     Remove(remove::Command),
     List(list::Command),
+
+    #[command(name = "self")]
+    Self_(self_::Command),
+
     Show(show::Command),
     Update(update::Command),
     Which(which::Command),
@@ -42,6 +47,7 @@ impl Command {
             Commands::Install(cmd) => cmd.exec(&self.github_token).await,
             Commands::Remove(cmd) => cmd.exec(&self.github_token).await,
             Commands::List(cmd) => cmd.exec(&self.github_token).await,
+            Commands::Self_(cmd) => cmd.exec().await,
             Commands::Show(cmd) => cmd.exec(),
             Commands::Update(cmd) => cmd.exec(&self.github_token).await,
             Commands::Which(cmd) => cmd.exec(),
@@ -95,14 +101,6 @@ pub enum BinaryName {
     Walrus,
     #[value(name = "mvr")]
     Mvr,
-}
-
-#[derive(Debug, Subcommand)]
-pub enum SelfCommands {
-    #[command(about = "Update suiup itself")]
-    Update,
-    #[command(about = "Uninstall suiup")]
-    Uninstall,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
