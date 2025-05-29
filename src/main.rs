@@ -4,7 +4,6 @@
 use clap::Parser;
 use suiup::commands::Command;
 use suiup::paths::initialize;
-use tracing::error;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -12,7 +11,7 @@ async fn main() -> anyhow::Result<()> {
 
     let cmd = Command::parse();
     if let Err(err) = cmd.exec().await {
-        error!("{}", err);
+        eprintln!("Error: {}", err);
         std::process::exit(1);
     }
 
