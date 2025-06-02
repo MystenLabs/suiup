@@ -5,7 +5,7 @@
 `suiup` is a tool to install and manage different versions of CLI tools for working in the Sui ecosystem. It allows you to easily install and switch between different versions of `sui`, `mvr`, `walrus`.
 After installation, run `suiup list` to find which binaries you can install.
 
-Check out the [Quick Start](#quick-start) guide for how-to-use examples.
+Check out the [Installation](#installation) to install and the [Quick Start](#quick-start) guide for how-to-use examples.
 
 # Supported OS (for suiup tool, but not necessarily for the binaries it installs)
 
@@ -67,7 +67,7 @@ suiup install sui@testnet-1.40.1 # this will install the testnet v1.40.1 release
 
 > [!NOTE]
 > You can just pass the `@1.44.2` version instead of `sui@testnet-1.44.2` or omit it altogether `suiup install sui`, but you must remember
-that the default will be testnet release for sui/walrus. It's recommended to pass the release for the network you want to install.
+that the default will be testnet release for `sui/walrus`. It's recommended to pass the release for the network you want to install.
 
 ### Update `sui` to latest version
 This will check for newer releases of those that are already installed, and then download the new ones. Recommended to specify which release to update.
