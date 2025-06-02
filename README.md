@@ -51,19 +51,10 @@ It's recommended to read the whole quick start to familiarize yourself with the 
 > [!TIP]
 > Pass the `--yes (-y)` flag to skip confirmation prompts, thus accepting to updating the default binary to the one you are installing.
 
-### Install `sui` -- this will install the latest available testnet release
+### Install `sui` -- this will install the latest available `testnet` release
 ```bash
-suiup install sui
+suiup install sui@testnet
 ```
-
-### Install `sui` with specific version
-```bash
-suiup install sui@1.44.2 # this will install the testnet-v1.44.2 release
-```
-
-> [!TIP]
-> You can also use `==` or `=` to specify a version: `sui@1.44.2` is the same as `sui==1.44.2` or `sui=1.44.2`.
-
 
 ### Install `sui` with specific release (and version)
 ```bash
@@ -71,11 +62,18 @@ suiup install sui@devnet # this will install the latest available devnet release
 suiup install sui@testnet-1.40.1 # this will install the testnet v1.40.1 release
 ```
 
+> [!TIP]
+> You can also use `==` or `=` to specify a version: `sui@testnet-1.44.2` is the same as `sui==testnet-1.44.2` or `sui=testnet-1.44.2`.
+
+> [!NOTE]
+> You can just pass the `@1.44.2` version instead of `sui@testnet-1.44.2` or omit it altogether `suiup install sui`, but you must remember
+that the default will be testnet release for sui/walrus. It's recommended to pass the release for the network you want to install.
+
 ### Update `sui` to latest version
 This will check for newer releases of those that are already installed, and then download the new ones. Recommended to specify which release to update.
 ```bash
-suiup update sui devnet # recommended
-suiup update sui
+suiup update sui@devnet # recommended
+suiup update sui # alternative - not recommended, as it will update/install the latest testnet release
 ```
 
 ### Install `sui` binary to specific default directory
