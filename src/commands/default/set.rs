@@ -3,7 +3,7 @@
 
 use anyhow::{anyhow, bail, Result};
 use clap::Args;
-use tracing::debug;
+use tracing::{debug, info};
 
 use crate::{
     commands::{parse_component_with_version, BinaryName, CommandMetadata},
@@ -58,7 +58,11 @@ impl Command {
                 "standalone"
             }
         } else {
-            &network
+            if let Some(ref nightly) = nightly {
+                nightly
+            } else {
+                &network
+            }
         };
 
         // a map of network --> to BinaryVersion
@@ -128,6 +132,8 @@ impl Command {
         } else {
             src.push(binary_version);
         }
+
+        info!("File source: {}", src.display());
 
         #[cfg(target_os = "windows")]
         let filename = src.file_name().expect("Expected binary filename");
