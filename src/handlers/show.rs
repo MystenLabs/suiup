@@ -15,7 +15,6 @@ use tabled::{
 };
 use anyhow::Error;
 use std::collections::BTreeMap;
-use std::collections::HashMap;
 
 /// Handles the `show` command
 pub fn handle_show() -> Result<(), Error> {
@@ -23,12 +22,12 @@ pub fn handle_show() -> Result<(), Error> {
     let default: BTreeMap<String, (String, Version, bool)> = serde_json::from_str(&default)?;
     let default_binaries = Binaries::from(default);
 
-    ///   default binaries list
+    
     let  default_list = default_binaries.binaries
                     .iter()
                     .map(|t|  format!("{}-{}-{}",t.network_release, t.binary_name, t.version))
                     .collect::<HashSet<String>>();
-     //println!("{:?}",default_list);
+     
 
     
     let installed_binaries = installed_binaries_grouped_by_network(None)?;
