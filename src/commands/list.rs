@@ -10,10 +10,20 @@ use super::ComponentCommands;
 
 /// List available binaries to install.
 #[derive(Args, Debug)]
-pub struct Command;
+pub struct Command{
+    /// List available binaries name
+     /// (e.g. 'sui')
+    component:String,
+}
 
 impl Command {
     pub async fn exec(&self, github_token: &Option<String>) -> Result<()> {
-        handle_cmd(ComponentCommands::List, github_token.to_owned()).await
+        handle_cmd(ComponentCommands::List{
+                        component: self.component.to_owned(),
+                    }, 
+            github_token.to_owned()
+        )
+        .await
+
     }
 }

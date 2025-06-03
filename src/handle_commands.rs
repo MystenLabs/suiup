@@ -21,15 +21,46 @@ use crate::types::InstalledBinaries;
 use crate::types::Repo;
 use crate::types::Version;
 use std::fs::create_dir_all;
+use crate::handlers::list::component_release_list;
 
 pub async fn handle_cmd(cmd: ComponentCommands, github_token: Option<String>) -> Result<(), Error> {
     match cmd {
-        ComponentCommands::List => {
-            let components = available_components();
-            println!("Available binaries to install:");
-            for component in components {
-                println!(" - {}", component);
+        ComponentCommands::List {
+            component,
+        }=>{
+             let command_metadata =
+                parse_component_with_version(&component).map_err(|e| anyhow!("{e}"))?;
+            let name = command_metadata.name;
+            if !available_components().contains(&name.to_string().as_str()) {
+                bail!("Binary {} does not exist", name);
             }
+            match &name{
+                BinaryName::Walrus => {
+                    component_release_list(
+                         Repo::Walrus,
+                         github_token.clone()
+                    )
+                    .await?;
+                }
+                BinaryName::Mvr =>{
+                    component_release_list(
+                         Repo::Mvr,
+                         github_token.clone()
+                    )
+                    .await?;
+                }
+                _=>{
+                    component_release_list(
+                         Repo::Sui,
+                         github_token.clone()
+                    )
+                    .await?;
+                }
+            }
+            // println!("Available binaries to install:");
+            // for component in components {
+            //     println!(" - {}", component);
+            // }
         }
         ComponentCommands::Add {
             component,
