@@ -58,7 +58,13 @@ impl Command {
 #[derive(Subcommand)]
 pub enum ComponentCommands {
     #[command(about = "List available binaries to install")]
-    List,
+    List{
+        #[arg(
+            num_args = 1..=2,
+            help = "List binaries release with optional version (e.g. 'sui')"
+        )]
+        component: String,
+    },
     #[command(about = "Add a binary")]
     Add {
         #[arg(

@@ -36,6 +36,7 @@ impl Display for Repo {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Release {
     pub assets: Vec<Asset>,
+    pub tag_name: String
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
