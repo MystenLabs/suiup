@@ -18,7 +18,7 @@ pub async fn release_list(
     github_token: Option<String>,
 ) -> Result<(Vec<Release>, Option<String>), anyhow::Error> {
     let release_url = format!("https://api.github.com/repos/{}/releases", repo);
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::Client::new();
     let mut request = client.get(&release_url).header("User-Agent", "suiup");
 
     // Add authorization header if token is provided
@@ -33,6 +33,7 @@ pub async fn release_list(
 
     let response = request
         .send()
+        .await
         .map_err(|e| anyhow!("Could not send request: {e}"))?;
 
     // note this only works with authenticated requests. Should add support for that later.
@@ -50,11 +51,8 @@ pub async fn release_list(
         .get(ETAG)
         .and_then(|v| v.to_str().ok())
         .map(String::from);
-    let response = response.error_for_status();
-    if let Err(ref e) = response {
-        bail!("Response error: {e}");
-    }
-    let releases: Vec<Release> = response.unwrap().json()?;
+    let response = response.error_for_status()?;
+    let releases: Vec<Release> = response.json().await?;
     save_release_list(repo, &releases, etag.clone())?;
 
     Ok((releases, etag))

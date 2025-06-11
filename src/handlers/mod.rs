@@ -78,6 +78,34 @@ pub fn update_after_install(
     debug: bool,
     yes: bool,
 ) -> Result<(), Error> {
+    // First check if the binary exists
+    for binary in name {
+        let binary_name = if *binary == "sui" && debug {
+            format!("{}-debug", binary)
+        } else {
+            binary.clone()
+        };
+
+        let binary_path = if version == "nightly" {
+            binaries_dir()
+                .join(&network)
+                .join("bin")
+                .join(&binary_name)
+        } else {
+            binaries_dir()
+                .join(&network)
+                .join(format!("{}-{}", binary_name, version))
+        };
+
+        #[cfg(target_os = "windows")]
+        let binary_path = binary_path.with_extension("exe");
+
+        if !binary_path.exists() {
+            println!("Binary not found at {}. Skipping default version update.", binary_path.display());
+            return Ok(());
+        }
+    }
+
     let input = if yes {
         "y".to_string()
     } else {
