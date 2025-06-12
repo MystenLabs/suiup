@@ -87,10 +87,7 @@ pub fn update_after_install(
         };
 
         let binary_path = if version == "nightly" {
-            binaries_dir()
-                .join(&network)
-                .join("bin")
-                .join(&binary_name)
+            binaries_dir().join(&network).join("bin").join(&binary_name)
         } else {
             binaries_dir()
                 .join(&network)
@@ -101,7 +98,10 @@ pub fn update_after_install(
         let binary_path = binary_path.with_extension("exe");
 
         if !binary_path.exists() {
-            println!("Binary not found at {}. Skipping default version update.", binary_path.display());
+            println!(
+                "Binary not found at {}. Skipping default version update.",
+                binary_path.display()
+            );
             return Ok(());
         }
     }

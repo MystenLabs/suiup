@@ -7,7 +7,9 @@ mod remover;
 
 use anyhow::Result;
 
-use crate::commands::{parse_component_with_version, BinaryName, CommandMetadata, ComponentCommands};
+use crate::commands::{
+    parse_component_with_version, BinaryName, CommandMetadata, ComponentCommands,
+};
 
 /// ComponentManager handles all component-related operations
 pub struct ComponentManager {
@@ -51,8 +53,21 @@ impl ComponentManager {
         debug: bool,
         yes: bool,
     ) -> Result<()> {
-        let CommandMetadata { name, network, version } = command_metadata;
-        installer::install_component(name, network, version, nightly, debug, yes, self.github_token.clone()).await
+        let CommandMetadata {
+            name,
+            network,
+            version,
+        } = command_metadata;
+        installer::install_component(
+            name,
+            network,
+            version,
+            nightly,
+            debug,
+            yes,
+            self.github_token.clone(),
+        )
+        .await
     }
 
     /// Remove a component

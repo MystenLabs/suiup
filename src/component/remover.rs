@@ -65,13 +65,16 @@ pub async fn remove_component(binary: BinaryName) -> Result<()> {
         .iter()
         .map(|x| &x.binary_name)
         .collect::<HashSet<_>>();
-    
+
     for binary in default_binaries_to_remove {
         let default_bin_path = get_default_bin_dir().join(binary);
         if default_bin_path.exists() {
             std::fs::remove_file(&default_bin_path)
                 .map_err(|e| anyhow!("Cannot remove file: {e}"))?;
-            debug!("Removed {} from default binaries folder", default_bin_path.display());
+            debug!(
+                "Removed {} from default binaries folder",
+                default_bin_path.display()
+            );
         }
 
         default_binaries.remove(binary);

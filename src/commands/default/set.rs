@@ -57,12 +57,10 @@ impl Command {
             } else {
                 "standalone"
             }
+        } else if let Some(ref nightly) = nightly {
+            nightly
         } else {
-            if let Some(ref nightly) = nightly {
-                nightly
-            } else {
-                &network
-            }
+            &network
         };
 
         // a map of network --> to BinaryVersion
