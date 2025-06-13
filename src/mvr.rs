@@ -8,7 +8,6 @@ use crate::{
     types::Repo,
 };
 use anyhow::{anyhow, Error};
-use reqwest::blocking::Client;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
@@ -40,8 +39,8 @@ impl MvrInstaller {
         }
     }
 
-    pub fn get_releases(&mut self) -> Result<(), Error> {
-        let client = Client::new();
+    pub async fn get_releases(&mut self) -> Result<(), Error> {
+        let client = reqwest::Client::new();
         let url = format!("https://api.github.com/repos/{}/releases", Repo::Mvr);
 
         if !self.releases.is_empty() {
@@ -51,8 +50,10 @@ impl MvrInstaller {
         let releases: Vec<MvrRelease> = client
             .get(&url)
             .header("User-Agent", "suiup")
-            .send()?
-            .json()?;
+            .send()
+            .await?
+            .json()
+            .await?;
         self.releases = releases;
         Ok(())
     }
@@ -76,7 +77,7 @@ impl MvrInstaller {
             }
         } else {
             if self.releases.is_empty() {
-                self.get_releases()?;
+                self.get_releases().await?;
             }
             let latest_release = self.get_latest_release()?.tag_name.clone();
             println!("No version specified. Downloading latest release: {latest_release}");
@@ -98,7 +99,7 @@ impl MvrInstaller {
         }
 
         if self.releases.is_empty() {
-            self.get_releases()?;
+            self.get_releases().await?;
         }
 
         let release = self

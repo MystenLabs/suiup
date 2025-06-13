@@ -124,12 +124,14 @@ pub async fn handle_update() -> Result<()> {
 
     // find the latest version on github in releases
     let repo = "https://api.github.com/repos/MystenLabs/suiup/releases/latest";
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::Client::new();
     let response = client
         .get(repo)
         .header("User-Agent", "suiup")
-        .send()?
-        .json::<serde_json::Value>()?;
+        .send()
+        .await?
+        .json::<serde_json::Value>()
+        .await?;
     let tag = response["tag_name"]
         .as_str()
         .ok_or_else(|| anyhow::anyhow!("Failed to parse latest version from GitHub response"))?;
