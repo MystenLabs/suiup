@@ -1,9 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-mod installer;
-mod lister;
-mod remover;
+mod install;
+mod list;
+mod remove;
 
 use anyhow::Result;
 
@@ -42,7 +42,7 @@ impl ComponentManager {
 
     /// List all available components
     async fn list_components(&self) -> Result<()> {
-        lister::list_components().await
+        list::list_components().await
     }
 
     /// Install a component
@@ -58,7 +58,7 @@ impl ComponentManager {
             network,
             version,
         } = command_metadata;
-        installer::install_component(
+        install::install_component(
             name,
             network,
             version,
@@ -72,6 +72,6 @@ impl ComponentManager {
 
     /// Remove a component
     async fn remove_component(&self, binary: BinaryName) -> Result<()> {
-        remover::remove_component(binary).await
+        remove::remove_component(binary).await
     }
 }
