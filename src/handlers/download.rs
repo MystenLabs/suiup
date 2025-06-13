@@ -53,7 +53,7 @@ pub async fn download_release_at_version(
     let tag = format!("{}-{}", network, version);
 
     println!("Searching for release with tag: {}...", tag);
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::Client::new();
     let mut headers = HeaderMap::new();
 
     let releases = release_list(&repo, github_token.clone()).await?.0;
@@ -75,13 +75,13 @@ pub async fn download_release_at_version(
         }
 
         let url = format!("https://api.github.com/repos/{repo}/releases/tags/{}", tag);
-        let response = client.get(&url).headers(headers).send()?;
+        let response = client.get(&url).headers(headers).send().await?;
 
         if !response.status().is_success() {
             bail!("release {tag} not found");
         }
 
-        let release: Release = response.json()?;
+        let release: Release = response.json().await?;
         download_asset_from_github(&release, &os, &arch, github_token).await
     }
 }
