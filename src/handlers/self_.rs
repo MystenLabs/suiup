@@ -6,11 +6,62 @@ use super::download::detect_os_arch;
 use crate::handlers::download::download_file;
 use anyhow::{anyhow, Result};
 use std::{fmt::Display, process::Command};
+use tokio::task;
 
 use flate2::read::GzDecoder;
+use serde::Deserialize;
 use std::fs::File;
 use tar::Archive;
 
+#[derive(Debug, Deserialize)]
+struct GitHubRelease {
+    tag_name: String,
+}
+
+pub fn check_for_updates() {
+    task::spawn(check_for_updates_impl());
+}
+
+async fn check_for_updates_impl() -> Option<()> {
+    let current_exe = std::env::current_exe().ok()?;
+    let output = std::process::Command::new(current_exe)
+        .arg("--version")
+        .output()
+        .ok()?;
+
+    let version_output = String::from_utf8(output.stdout).ok()?;
+    let version = version_output.split_whitespace().nth(1)?;
+    let current_version = Ver::from_str(version).ok()?;
+
+    let latest_version = get_latest_version().await.ok()?;
+
+    if !current_version.same(&latest_version) {
+        eprintln!(
+            "\n⚠️  A new version of suiup is available: v{} → v{}",
+            current_version, latest_version
+        );
+        eprintln!("   Run 'suiup self update' to update to the latest version.\n");
+    }
+    Some(())
+}
+
+async fn get_latest_version() -> Result<Ver> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get("https://api.github.com/repos/MystenLabs/suiup/releases/latest")
+        .header("User-Agent", "suiup")
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        return Err(anyhow!("Failed to fetch latest version from GitHub"));
+    }
+
+    let release: GitHubRelease = response.json().await?;
+    Ver::from_str(&release.tag_name)
+}
+
+#[derive(Debug, Clone)]
 struct Ver {
     major: usize,
     minor: usize,
