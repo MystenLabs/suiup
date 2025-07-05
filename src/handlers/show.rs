@@ -8,6 +8,7 @@ use crate::{
 };
 use anyhow::Error;
 use std::collections::BTreeMap;
+use prettytable::{Table, row};
 
 /// Handles the `show` command
 pub fn handle_show() -> Result<(), Error> {
@@ -15,18 +16,36 @@ pub fn handle_show() -> Result<(), Error> {
     let default: BTreeMap<String, (String, Version, bool)> = serde_json::from_str(&default)?;
     let default_binaries = Binaries::from(default);
 
-    println!("\x1b[1mDefault binaries:\x1b[0m\n{default_binaries}");
+    // Default binaries table
+    let mut default_table = Table::new();
+    default_table.add_row(row!["Network", "Binary", "Version", "Debug"]);
+    for b in &default_binaries.binaries {
+        default_table.add_row(row![
+            b.network_release,
+            b.binary_name,
+            b.version,
+            if b.debug { "Yes" } else { "No" }
+        ]);
+    }
+    println!("\x1b[1mDefault binaries:\x1b[0m");
+    default_table.printstd();
 
+    // Installed binaries table
     let installed_binaries = installed_binaries_grouped_by_network(None)?;
-
-    println!("\x1b[1mInstalled binaries:\x1b[0m");
-
+    let mut installed_table = Table::new();
+    installed_table.add_row(row!["Network", "Binary", "Version", "Debug"]);
     for (network, binaries) in installed_binaries {
-        println!("[{network} release/branch]");
-        for binary in binaries {
-            println!("    {binary}");
+        for b in binaries {
+            installed_table.add_row(row![
+                network.to_string(),
+                b.binary_name,
+                b.version,
+                if b.debug { "Yes" } else { "No" }
+            ]);
         }
     }
+    println!("\x1b[1mInstalled binaries:\x1b[0m");
+    installed_table.printstd();
 
     Ok(())
 }
