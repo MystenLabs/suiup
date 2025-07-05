@@ -13,6 +13,9 @@ use reqwest::{
     Client,
 };
 use std::{cmp::min, io::Write, path::PathBuf, time::Instant};
+use std::fs::File;
+use std::io::Read;
+use md5::Context;
 
 /// Detects the current OS and architecture
 pub fn detect_os_arch() -> Result<(String, String), Error> {
@@ -154,18 +157,39 @@ pub async fn download_file(
 
     if download_to.exists() {
         if download_to.metadata()?.len() == total_size {
-            println!("Found {name} in cache");
-            return Ok(name.to_string());
-        } else {
-            std::fs::remove_file(download_to)?;
+            // Check md5 if .md5 file exists
+            let md5_path = download_to.with_extension("md5");
+            if md5_path.exists() {
+                let mut file = File::open(download_to)?;
+                let mut hasher = Context::new();
+                let mut buffer = [0u8; 8192];
+                loop {
+                    let n = file.read(&mut buffer)?;
+                    if n == 0 { break; }
+                    hasher.consume(&buffer[..n]);
+                }
+                let result = hasher.compute();
+                let local_md5 = format!("{:x}", result);
+                let expected_md5 = std::fs::read_to_string(md5_path)?.trim().to_string();
+                if local_md5 == expected_md5 {
+                    println!("Found {name} in cache, md5 verified");
+                    return Ok(name.to_string());
+                } else {
+                    println!("MD5 mismatch for {name}, re-downloading...");
+                }
+            } else {
+                println!("Found {name} in cache (no md5 to check)");
+                return Ok(name.to_string());
+            }
         }
+        std::fs::remove_file(download_to)?;
     }
 
     let pb = ProgressBar::new(total_size);
     pb.set_style(ProgressStyle::default_bar()
-            .template("Downloading release: {spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta}) {msg}")
-            .unwrap()
-            .progress_chars("=>-"));
+        .template("Downloading release: {spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta}) {msg}")
+        .unwrap()
+        .progress_chars("=>-"));
 
     let mut file = std::fs::File::create(download_to)?;
     let mut downloaded: u64 = 0;
@@ -187,6 +211,27 @@ pub async fn download_file(
     }
 
     pb.finish_with_message("Download complete");
+
+    // After download, check md5 if .md5 file exists
+    let md5_path = download_to.with_extension("md5");
+    if md5_path.exists() {
+        let mut file = File::open(download_to)?;
+        let mut hasher = Context::new();
+        let mut buffer = [0u8; 8192];
+        loop {
+            let n = file.read(&mut buffer)?;
+            if n == 0 { break; }
+            hasher.consume(&buffer[..n]);
+        }
+        let result = hasher.compute();
+        let local_md5 = format!("{:x}", result);
+        let expected_md5 = std::fs::read_to_string(md5_path)?.trim().to_string();
+        if local_md5 != expected_md5 {
+            return Err(anyhow!(format!("MD5 check failed for {}: expected {}, got {}", name, expected_md5, local_md5)));
+        } else {
+            println!("MD5 check passed for {name}");
+        }
+    }
 
     Ok(name.to_string())
 }
