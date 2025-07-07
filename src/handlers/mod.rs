@@ -87,7 +87,11 @@ pub fn update_after_install(
         };
 
         let binary_path = if version == "nightly" {
-            binaries_dir().join(&network).join("bin").join(&binary_name)
+            // cargo install places the binary in a `bin` folder
+            binaries_dir()
+                .join(&network)
+                .join("bin")
+                .join(format!("{}-{}", binary_name, version))
         } else {
             binaries_dir()
                 .join(&network)
