@@ -1,7 +1,4 @@
-> [!CAUTION]
-> Highly experimental, use at your own risk. Not recommended for production use. This software is provided as is.
-
-# Suiup - installer and manager of CLI tools in the Sui ecosystem
+# Suiup - the installer and manager for CLI tools in the Sui ecosystem
 `suiup` is a tool to install and manage different versions of CLI tools for working in the Sui ecosystem. It allows you to easily install and switch between different versions of `sui`, `mvr`, `walrus`.
 After installation, run `suiup list` to find which binaries you can install. Check out the [Installation](#installation) to install and the [Quick Start](#quick-start) guide for how-to-use examples.
 
@@ -233,3 +230,8 @@ Use `suiup which` to see where the default binaries are stored.
 
 For Unix/MacOS they are copied to `$HOME/.local/bin` (or where your `SUIUP_DEFAULT_BIN_DIR` env var points to) and for Windows they are copied to `LOCALAPPDATA\bin`.
 Make sure you have these folders on the `PATH`.
+
+
+# Disclaimer
+
+This software is provided “as is”, without warranty of any kind, express or implied.
