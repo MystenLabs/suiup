@@ -1,23 +1,24 @@
 > [!CAUTION]
 > Highly experimental, use at your own risk. Not recommended for production use. This software is provided as is.
 
-# Suiup - Installer & version manager for Sui tools
+# Suiup - installer and manager of CLI tools in the Sui ecosystem
 `suiup` is a tool to install and manage different versions of CLI tools for working in the Sui ecosystem. It allows you to easily install and switch between different versions of `sui`, `mvr`, `walrus`.
 After installation, run `suiup list` to find which binaries you can install. Check out the [Installation](#installation) to install and the [Quick Start](#quick-start) guide for how-to-use examples.
 
 # Why suiup? 
-Sui CLI has been for a long time available to install via `brew`, `chocolatey`, `cargo install`, or by downloading the binaries manually. As Sui's release cycle is bi-weekly, developers need to update more often the Sui cli or 
-in some cases, they need to install a specific version of the cli (e.g., a build against devnet or a debug build). There was no simple way to switch between versions or to install a specific build that was not available on `brew` or `chocolatey`.
+The Sui CLI has long been available through tools like Homebrew, Chocolatey, or cargo install, or by downloading binaries manually. But with Sui releasing updates every two weeks, developers often need to upgrade frequently or use a specific version (e.g., for devnet or debug builds). Switching between versions or installing non-package-managers builds is not as simple as we want it to be.
 
-With the addition of newer cli tools such as [`mvr`](https://docs.suins.io/move-registry) and [`walrus`](https://docs.wal.app/usage/setup.html), it became even more cumbersome to install and manage the tools as they were not available via `brew` or `chocolatey`, and required mostly manual installation.
-With `suiup` developers have a dedicated tool to install and manage several key tools and their versions when working in the Sui ecosystem.
+As new tools like [mvr](https://docs.suins.io/move-registry#using-mvr) and [walrus](https://docs.wal.app/usage/setup.html) were introduced—without support from package managers—managing them became even harder due to manual installation steps.
 
-A few examples of what `suiup` allows you to do:
-- install a specific version or release of `sui`, `mvr`, or `walrus` CLI tools (and soon more tools)
-- install from a branch -- useful when you want to test a new feature or a fix that is not yet released
-- install a debug version for Sui CLI -- this is useful when needing to run `sui move test --coverage`, which is available only with the binary compiled in debug mode.
-- list the installed binaries, enabling to quickly switch between them (very useful for testing / publishing against different networks where the protocol version might be different; e.g., devnet is on a newer protocol version so it requires a cli build against devnet)
-- simplify the installation of tools in CI
+`suiup` solves this by offering a simple way to install and manage multiple CLI tools and their versions in the Sui ecosystem.
+
+With `suiup`, you can:
+
+- Install specific versions of `sui`, `mvr`, or `walrus` (with more tools coming soon)
+- Install from a branch in the repository to try unreleased features or fixes
+- Get debug builds of `sui` (needed for commands like `sui move test --coverage`)
+- List and switch between installed binaries for different networks (e.g., devnet vs mainnet)
+- Simplify tool installation in CI environments
 
 # Supported OS (for suiup tool, but not necessarily for the binaries it installs)
 
