@@ -1,11 +1,23 @@
 > [!CAUTION]
 > Highly experimental, use at your own risk. Not recommended for production use. This software is provided as is.
 
-# Overview
+# Suiup - Installer & version manager for Sui tools
 `suiup` is a tool to install and manage different versions of CLI tools for working in the Sui ecosystem. It allows you to easily install and switch between different versions of `sui`, `mvr`, `walrus`.
-After installation, run `suiup list` to find which binaries you can install.
+After installation, run `suiup list` to find which binaries you can install. Check out the [Installation](#installation) to install and the [Quick Start](#quick-start) guide for how-to-use examples.
 
-Check out the [Installation](#installation) to install and the [Quick Start](#quick-start) guide for how-to-use examples.
+# Why suiup? 
+Sui CLI has been for a long time available to install via `brew`, `chocolatey`, `cargo install`, or by downloading the binaries manually. As Sui's release cycle is bi-weekly, developers need to update more often the Sui cli or 
+in some cases, they need to install a specific version of the cli (e.g., a build against devnet or a debug build). There was no simple way to switch between versions or to install a specific build that was not available on `brew` or `chocolatey`.
+
+With the addition of newer cli tools such as [`mvr`](https://docs.suins.io/move-registry) and [`walrus`](https://docs.wal.app/usage/setup.html), it became even more cumbersome to install and manage the tools as they were not available via `brew` or `chocolatey`, and required mostly manual installation.
+With `suiup` developers have a dedicated tool to install and manage several key tools and their versions when working in the Sui ecosystem.
+
+A few examples of what `suiup` allows you to do:
+- install a specific version or release of `sui`, `mvr`, or `walrus` CLI tools (and soon more tools)
+- install from a branch -- useful when you want to test a new feature or a fix that is not yet released
+- install a debug version for Sui CLI -- this is useful when needing to run `sui move test --coverage`, which is available only with the binary compiled in debug mode.
+- list the installed binaries, enabling to quickly switch between them (very useful for testing / publishing against different networks where the protocol version might be different; e.g., devnet is on a newer protocol version so it requires a cli build against devnet)
+- simplify the installation of tools in CI
 
 # Supported OS (for suiup tool, but not necessarily for the binaries it installs)
 
