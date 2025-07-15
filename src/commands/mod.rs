@@ -10,11 +10,12 @@ mod show;
 mod update;
 mod which;
 
+use crate::types::BinaryVersion;
 use anyhow::{anyhow, bail, Result};
 use clap::{Parser, Subcommand, ValueEnum};
-use comfy_table::presets::ASCII_BORDERS_ONLY;
 use comfy_table::Table;
-use crate::types::BinaryVersion;
+
+const TABLE_FORMAT: &str = "  ── ══      ──    ";
 
 #[derive(Parser)]
 #[command(arg_required_else_help = true, disable_help_subcommand = true)]
@@ -221,8 +222,8 @@ pub fn print_table(binaries: &Vec<BinaryVersion>) {
     binaries_vec.sort_by_key(|b| b.binary_name.clone());
     let mut table = Table::new();
     table
-        .load_preset(ASCII_BORDERS_ONLY)
-        .set_header(vec!["Binary", "Release", "Version", "Debug"])
+        .load_preset(TABLE_FORMAT)
+        .set_header(vec!["Binary", "Release / Branch", "Version", "Debug"])
         .add_rows(
             binaries_vec
                 .into_iter()
