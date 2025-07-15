@@ -12,6 +12,9 @@ mod which;
 
 use anyhow::{anyhow, bail, Result};
 use clap::{Parser, Subcommand, ValueEnum};
+use comfy_table::presets::ASCII_BORDERS_ONLY;
+use comfy_table::Table;
+use crate::types::BinaryVersion;
 
 #[derive(Parser)]
 #[command(arg_required_else_help = true, disable_help_subcommand = true)]
@@ -210,6 +213,34 @@ pub fn parse_version_spec(spec: Option<String>) -> Result<(String, Option<String
             }
         }
     }
+}
+
+pub fn print_table(binaries: &Vec<BinaryVersion>) {
+    let mut binaries_vec = binaries.clone();
+    // sort by Binary column
+    binaries_vec.sort_by_key(|b| b.binary_name.clone());
+    let mut table = Table::new();
+    table
+        .load_preset(ASCII_BORDERS_ONLY)
+        .set_header(vec!["Binary", "Release", "Version", "Debug"])
+        .add_rows(
+            binaries_vec
+                .into_iter()
+                .map(|binary| {
+                    vec![
+                        binary.binary_name,
+                        binary.network_release,
+                        binary.version,
+                        if binary.debug {
+                            "Yes".to_string()
+                        } else {
+                            "No".to_string()
+                        },
+                    ]
+                })
+                .collect::<Vec<Vec<String>>>(),
+        );
+    println!("{table}");
 }
 
 #[cfg(test)]

@@ -8,7 +8,8 @@ use crate::{
 };
 use anyhow::Error;
 use std::collections::BTreeMap;
-use prettytable::{Table, row};
+
+use crate::commands::print_table;
 
 /// Handles the `show` command
 pub fn handle_show() -> Result<(), Error> {
@@ -17,35 +18,17 @@ pub fn handle_show() -> Result<(), Error> {
     let default_binaries = Binaries::from(default);
 
     // Default binaries table
-    let mut default_table = Table::new();
-    default_table.add_row(row!["Network", "Binary", "Version", "Debug"]);
-    for b in &default_binaries.binaries {
-        default_table.add_row(row![
-            b.network_release,
-            b.binary_name,
-            b.version,
-            if b.debug { "Yes" } else { "No" }
-        ]);
-    }
+
     println!("\x1b[1mDefault binaries:\x1b[0m");
-    default_table.printstd();
+    print_table(&default_binaries.binaries);
 
     // Installed binaries table
     let installed_binaries = installed_binaries_grouped_by_network(None)?;
-    let mut installed_table = Table::new();
-    installed_table.add_row(row!["Network", "Binary", "Version", "Debug"]);
-    for (network, binaries) in installed_binaries {
-        for b in binaries {
-            installed_table.add_row(row![
-                network.to_string(),
-                b.binary_name,
-                b.version,
-                if b.debug { "Yes" } else { "No" }
-            ]);
-        }
-    }
+    let binaries = installed_binaries.into_iter().flat_map(|(_,binaries)| {
+        binaries.to_owned()
+    }).collect();
     println!("\x1b[1mInstalled binaries:\x1b[0m");
-    installed_table.printstd();
+    print_table(&binaries);
 
     Ok(())
 }

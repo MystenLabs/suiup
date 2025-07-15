@@ -10,7 +10,8 @@ use crate::{
     paths::default_file_path,
     types::{Binaries, Version},
 };
-use prettytable::{Table, row};
+
+use crate::commands::print_table;
 
 /// Get the default Sui CLI version.
 #[derive(Args, Debug)]
@@ -22,18 +23,8 @@ impl Command {
         let default: BTreeMap<String, (String, Version, bool)> = serde_json::from_str(&default)?;
         let binaries = Binaries::from(default);
 
-        let mut table = Table::new();
-        table.add_row(row!["Network", "Binary", "Version", "Debug"]);
-        for b in &binaries.binaries {
-            table.add_row(row![
-                b.network_release,
-                b.binary_name,
-                b.version,
-                if b.debug { "Yes" } else { "No" }
-            ]);
-        }
         println!("\x1b[1mDefault binaries:\x1b[0m");
-        table.printstd();
+        print_table(&binaries.binaries);
         Ok(())
     }
 }
