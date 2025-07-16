@@ -220,7 +220,7 @@ pub fn print_table(binaries: &Vec<BinaryVersion>) {
     binaries_vec.sort_by_key(|b| b.binary_name.clone());
     let mut table = Table::new();
     table
-        .load_preset(ASCII_BORDERS_ONLY)
+        .load_preset(TABLE_FORMAT)
         .set_header(vec!["Binary", "Release", "Version", "Debug"])
         .add_rows(
             binaries_vec
