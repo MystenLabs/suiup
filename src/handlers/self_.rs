@@ -35,7 +35,7 @@ async fn check_for_updates_impl() -> Option<()> {
 
     let latest_version = get_latest_version().await.ok()?;
 
-    if !current_version.same(&latest_version) {
+    if current_version < latest_version {
         eprintln!(
             "\n⚠️  A new version of suiup is available: v{} → v{}",
             current_version, latest_version
@@ -61,7 +61,7 @@ async fn get_latest_version() -> Result<Ver> {
     Ver::from_str(&release.tag_name)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct Ver {
     major: usize,
     minor: usize,
@@ -87,10 +87,6 @@ impl Ver {
             minor,
             patch,
         })
-    }
-
-    fn same(&self, new: &Self) -> bool {
-        self.major == new.major && self.minor == new.minor && self.patch == new.patch
     }
 }
 
@@ -138,7 +134,7 @@ pub async fn handle_update() -> Result<()> {
 
     let latest_version = Ver::from_str(tag)?;
 
-    if current_version.same(&latest_version) {
+    if current_version == latest_version {
         println!("suiup is already up to date");
         return Ok(());
     } else {
@@ -214,4 +210,113 @@ fn find_archive_name() -> Result<String> {
     };
 
     Ok(filename)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ver_from_str_valid_versions() {
+        // Test basic version parsing
+        let v1 = Ver::from_str("1.2.3").unwrap();
+        assert_eq!(v1.major, 1);
+        assert_eq!(v1.minor, 2);
+        assert_eq!(v1.patch, 3);
+
+        // Test version with 'v' prefix
+        let v2 = Ver::from_str("v1.2.3").unwrap();
+        assert_eq!(v2.major, 1);
+        assert_eq!(v2.minor, 2);
+        assert_eq!(v2.patch, 3);
+
+        // Test zero versions
+        let v3 = Ver::from_str("0.0.0").unwrap();
+        assert_eq!(v3.major, 0);
+        assert_eq!(v3.minor, 0);
+        assert_eq!(v3.patch, 0);
+
+        // Test larger version numbers
+        let v4 = Ver::from_str("v10.20.30").unwrap();
+        assert_eq!(v4.major, 10);
+        assert_eq!(v4.minor, 20);
+        assert_eq!(v4.patch, 30);
+    }
+
+    #[test]
+    fn test_ver_from_str_invalid_versions() {
+        // Test invalid formats
+        assert!(Ver::from_str("1.2").is_err());
+        assert!(Ver::from_str("1.2.3.4").is_err());
+        assert!(Ver::from_str("1").is_err());
+        assert!(Ver::from_str("").is_err());
+        assert!(Ver::from_str("a.b.c").is_err());
+        assert!(Ver::from_str("1.a.3").is_err());
+        assert!(Ver::from_str("v1.2.c").is_err());
+    }
+
+    #[test]
+    fn test_ver_equality() {
+        let v1 = Ver::from_str("1.2.3").unwrap();
+        let v2 = Ver::from_str("v1.2.3").unwrap();
+        let v3 = Ver::from_str("1.2.4").unwrap();
+
+        assert_eq!(v1, v2);
+        assert_eq!(v2, v1);
+        assert_ne!(v1, v3);
+        assert_ne!(v3, v1);
+    }
+
+    #[test]
+    fn test_ver_ordering() {
+        // Test major version differences
+        let v1_0_0 = Ver::from_str("1.0.0").unwrap();
+        let v2_0_0 = Ver::from_str("2.0.0").unwrap();
+        assert!(v1_0_0 < v2_0_0);
+        assert!(v2_0_0 > v1_0_0);
+
+        // Test minor version differences
+        let v1_1_0 = Ver::from_str("1.1.0").unwrap();
+        let v1_2_0 = Ver::from_str("1.2.0").unwrap();
+        assert!(v1_1_0 < v1_2_0);
+        assert!(v1_2_0 > v1_1_0);
+
+        // Test patch version differences
+        let v1_1_1 = Ver::from_str("1.1.1").unwrap();
+        let v1_1_2 = Ver::from_str("1.1.2").unwrap();
+        assert!(v1_1_1 < v1_1_2);
+        assert!(v1_1_2 > v1_1_1);
+
+        // Test same versions
+        let v1 = Ver::from_str("1.2.3").unwrap();
+        let v2 = Ver::from_str("v1.2.3").unwrap();
+        assert!(v1 <= v2);
+        assert!(v1 >= v2);
+        assert!(!(v1 < v2));
+        assert!(!(v1 > v2));
+
+        // Test complex comparisons
+        let v0_0_4 = Ver::from_str("0.0.4").unwrap();
+        let v0_0_3 = Ver::from_str("0.0.3").unwrap();
+        assert!(v0_0_3 < v0_0_4);
+        assert!(v0_0_4 > v0_0_3);
+
+        // Test the specific case from the bug report
+        let current = Ver::from_str("0.0.4").unwrap();
+        let latest = Ver::from_str("0.0.3").unwrap();
+        assert!(!(current < latest)); // Current is newer, should not show warning
+        assert!(latest < current); // Latest is older than current
+    }
+
+    #[test]
+    fn test_ver_display() {
+        let v1 = Ver::from_str("1.2.3").unwrap();
+        assert_eq!(format!("{}", v1), "1.2.3");
+
+        let v2 = Ver::from_str("v10.20.30").unwrap();
+        assert_eq!(format!("{}", v2), "10.20.30");
+
+        let v3 = Ver::from_str("0.0.0").unwrap();
+        assert_eq!(format!("{}", v3), "0.0.0");
+    }
 }

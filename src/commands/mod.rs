@@ -10,10 +10,10 @@ mod show;
 mod update;
 mod which;
 
+use crate::{handlers::self_::check_for_updates, types::BinaryVersion};
 use anyhow::{anyhow, bail, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use comfy_table::Table;
-use crate::types::BinaryVersion;
 pub const TABLE_FORMAT: &str = "  ── ══      ──    ";
 #[derive(Parser)]
 #[command(arg_required_else_help = true, disable_help_subcommand = true)]
@@ -25,6 +25,10 @@ pub struct Command {
     /// GitHub API token for authenticated requests (helps avoid rate limits).
     #[arg(long, env = "GITHUB_TOKEN", global = true)]
     pub github_token: Option<String>,
+
+    /// Disable update warnings for suiup itself.
+    #[arg(long, env = "SUIUP_DISABLE_UPDATE_WARNINGS", global = true)]
+    pub disable_update_warnings: bool,
 }
 
 #[derive(Subcommand)]
@@ -44,6 +48,11 @@ pub enum Commands {
 
 impl Command {
     pub async fn exec(&self) -> Result<()> {
+        // Check for updates before executing any command (except self update to avoid recursion)
+        if !matches!(self.command, Commands::Self_(_)) && !self.disable_update_warnings {
+            check_for_updates();
+        }
+
         match &self.command {
             Commands::Default(cmd) => cmd.exec(),
             Commands::Install(cmd) => cmd.exec(&self.github_token).await,

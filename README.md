@@ -128,6 +128,17 @@ suiup default set sui@testnet-1.40.0 --debug # set the default version to be the
 suiup which
 ```
 
+### Disable update warnings
+If you find the update warnings annoying, you can disable them:
+```bash
+# Using command line flag
+suiup --disable-update-warnings show
+
+# Using environment variable
+export SUIUP_DISABLE_UPDATE_WARNINGS=true
+suiup show
+```
+
 # Advanced Usage
 
 ### Pre-requisites

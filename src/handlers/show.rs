@@ -24,9 +24,10 @@ pub fn handle_show() -> Result<(), Error> {
 
     // Installed binaries table
     let installed_binaries = installed_binaries_grouped_by_network(None)?;
-    let binaries = installed_binaries.into_iter().flat_map(|(_,binaries)| {
-        binaries.to_owned()
-    }).collect();
+    let binaries = installed_binaries
+        .into_iter()
+        .flat_map(|(_, binaries)| binaries.to_owned())
+        .collect();
     println!("\x1b[1mInstalled binaries:\x1b[0m");
     print_table(&binaries);
 
