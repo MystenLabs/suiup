@@ -9,7 +9,7 @@ use comfy_table::*;
 pub async fn list_components() -> Result<()> {
     let components = crate::handlers::available_components();
     let mut table = Table::new();
-    table.load_preset(ASCII_BORDERS_ONLY)
+    table.load_preset(TABLE_FORMAT)
         .set_header(vec![Cell::new("Available Components")])
         .add_rows(
             components.iter().map(|component| {
