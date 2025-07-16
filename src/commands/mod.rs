@@ -15,7 +15,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use comfy_table::presets::ASCII_BORDERS_ONLY;
 use comfy_table::Table;
 use crate::types::BinaryVersion;
-
+pub const TABLE_FORMAT: &str = "  ── ══      ──    ";
 #[derive(Parser)]
 #[command(arg_required_else_help = true, disable_help_subcommand = true)]
 #[command(version, about)]
