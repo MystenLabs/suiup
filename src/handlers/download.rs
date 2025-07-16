@@ -8,14 +8,15 @@ use crate::{handlers::release::release_list, paths::release_archive_dir, types::
 use anyhow::{anyhow, bail, Error};
 use futures_util::StreamExt;
 use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
+use md5::Context;
 use reqwest::{
     header::{HeaderMap, HeaderValue, USER_AGENT},
     Client,
 };
-use std::{cmp::min, io::Write, path::PathBuf, time::Instant};
 use std::fs::File;
 use std::io::Read;
-use md5::Context;
+use std::{cmp::min, io::Write, path::PathBuf, time::Instant};
+use tracing::debug;
 
 /// Detects the current OS and architecture
 pub fn detect_os_arch() -> Result<(String, String), Error> {
@@ -96,6 +97,7 @@ pub async fn download_latest_release(
     github_token: Option<String>,
 ) -> Result<String, anyhow::Error> {
     println!("Downloading release list");
+    debug!("Downloading release list for repo: {repo} and network: {network}");
     let releases = release_list(&repo, github_token.clone()).await?;
 
     let (os, arch) = detect_os_arch()?;
@@ -165,10 +167,12 @@ pub async fn download_file(
                 let mut buffer = [0u8; 8192];
                 loop {
                     let n = file.read(&mut buffer)?;
-                    if n == 0 { break; }
+                    if n == 0 {
+                        break;
+                    }
                     hasher.consume(&buffer[..n]);
                 }
-                let result = hasher.compute();
+                let result = hasher.finalize();
                 let local_md5 = format!("{:x}", result);
                 let expected_md5 = std::fs::read_to_string(md5_path)?.trim().to_string();
                 if local_md5 == expected_md5 {
@@ -220,14 +224,19 @@ pub async fn download_file(
         let mut buffer = [0u8; 8192];
         loop {
             let n = file.read(&mut buffer)?;
-            if n == 0 { break; }
+            if n == 0 {
+                break;
+            }
             hasher.consume(&buffer[..n]);
         }
-        let result = hasher.compute();
+        let result = hasher.finalize();
         let local_md5 = format!("{:x}", result);
         let expected_md5 = std::fs::read_to_string(md5_path)?.trim().to_string();
         if local_md5 != expected_md5 {
-            return Err(anyhow!(format!("MD5 check failed for {}: expected {}, got {}", name, expected_md5, local_md5)));
+            return Err(anyhow!(format!(
+                "MD5 check failed for {}: expected {}, got {}",
+                name, expected_md5, local_md5
+            )));
         } else {
             println!("MD5 check passed for {name}");
         }

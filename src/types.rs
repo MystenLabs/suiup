@@ -17,18 +17,21 @@ use crate::paths::{default_file_path, installed_binaries_file};
 
 pub type Version = String;
 
+#[derive(Debug)]
 pub enum Repo {
     Sui,
     Mvr,
     Walrus,
+    WalrusSites,
 }
 
 impl Display for Repo {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Mvr => write!(f, "MystenLabs/mvr"),
             Self::Sui => write!(f, "MystenLabs/sui"),
             Self::Walrus => write!(f, "MystenLabs/walrus"),
-            Self::Mvr => write!(f, "MystenLabs/mvr"),
+            Self::WalrusSites => write!(f, "MystenLabs/walrus-sites"),
         }
     }
 }

@@ -97,12 +97,14 @@ pub enum ComponentCommands {
 #[derive(Clone, Debug, PartialEq, Hash, Eq, ValueEnum)]
 #[value(rename_all = "lowercase")]
 pub enum BinaryName {
+    #[value(name = "mvr")]
+    Mvr,
     #[value(name = "sui")]
     Sui,
     #[value(name = "walrus")]
     Walrus,
-    #[value(name = "mvr")]
-    Mvr,
+    #[value(name = "walrus-sites")]
+    WalrusSites,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -117,15 +119,17 @@ impl BinaryName {
         match self {
             BinaryName::Mvr => "https://github.com/MystenLabs/mvr",
             BinaryName::Walrus => "https://github.com/MystenLabs/walrus",
+            BinaryName::WalrusSites => "https://github.com/MystenLabs/walrus-sites",
             _ => "https://github.com/MystenLabs/sui",
         }
     }
 
     pub fn to_str(&self) -> &str {
         match self {
+            BinaryName::Mvr => "mvr",
             BinaryName::Sui => "sui",
             BinaryName::Walrus => "walrus",
-            BinaryName::Mvr => "mvr",
+            BinaryName::WalrusSites => "walrus-sites",
         }
     }
 }
@@ -133,9 +137,10 @@ impl BinaryName {
 impl std::fmt::Display for BinaryName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            BinaryName::Mvr => write!(f, "mvr"),
             BinaryName::Sui => write!(f, "sui"),
             BinaryName::Walrus => write!(f, "walrus"),
-            BinaryName::Mvr => write!(f, "mvr"),
+            BinaryName::WalrusSites => write!(f, "walrus-sites"),
         }
     }
 }
@@ -146,8 +151,9 @@ impl std::str::FromStr for BinaryName {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "sui" => Ok(BinaryName::Sui),
-            "walrus" => Ok(BinaryName::Walrus),
             "mvr" => Ok(BinaryName::Mvr),
+            "walrus" => Ok(BinaryName::Walrus),
+            "walrus-sites" => Ok(BinaryName::WalrusSites),
             _ => Err(format!("Unknown binary: {}", s)),
         }
     }

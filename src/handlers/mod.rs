@@ -32,7 +32,7 @@ pub mod which;
 pub const RELEASES_ARCHIVES_FOLDER: &str = "releases";
 
 pub fn available_components() -> &'static [&'static str] {
-    &["sui", "walrus", "mvr"]
+    &["sui", "mvr", "walrus", "walrus-sites"]
 }
 
 // Main component handling function
