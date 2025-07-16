@@ -1,8 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::commands::TABLE_FORMAT;
 use anyhow::Result;
-use comfy_table::presets::ASCII_BORDERS_ONLY;
 use comfy_table::*;
 
 /// List all available components
