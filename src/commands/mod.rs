@@ -221,7 +221,7 @@ pub fn print_table(binaries: &Vec<BinaryVersion>) {
     let mut table = Table::new();
     table
         .load_preset(TABLE_FORMAT)
-        .set_header(vec!["Binary", "Release", "Version", "Debug"])
+        .set_header(vec!["Binary", "Release/Branch", "Version", "Debug"])
         .add_rows(
             binaries_vec
                 .into_iter()
