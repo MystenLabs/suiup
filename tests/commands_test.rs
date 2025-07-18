@@ -4,9 +4,8 @@
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use suiup::commands::{
-        parse_component_with_version, switch::parse_binary_spec, BinaryName, CommandMetadata,
-    };
+    use suiup::commands::{parse_component_with_version, BinaryName, CommandMetadata};
+    use suiup::handlers::switch::parse_binary_spec;
 
     #[test]
     fn test_parse_component_with_version() -> Result<(), anyhow::Error> {

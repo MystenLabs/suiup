@@ -7,7 +7,7 @@ mod list;
 mod remove;
 mod self_;
 mod show;
-pub mod switch;
+mod switch;
 mod update;
 mod which;
 
