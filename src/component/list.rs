@@ -9,12 +9,14 @@ use comfy_table::*;
 pub async fn list_components() -> Result<()> {
     let components = crate::handlers::available_components();
     let mut table = Table::new();
-    table.load_preset(TABLE_FORMAT)
+    table
+        .load_preset(TABLE_FORMAT)
         .set_header(vec![Cell::new("Available Binaries to Install")])
         .add_rows(
-            components.iter().map(|component| {
-                vec![Cell::new(component)]
-            }).collect::<Vec<Vec<Cell>>>(),
+            components
+                .iter()
+                .map(|component| vec![Cell::new(component)])
+                .collect::<Vec<Vec<Cell>>>(),
         );
     println!("{table}");
     Ok(())

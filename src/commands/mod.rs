@@ -7,13 +7,14 @@ mod list;
 mod remove;
 mod self_;
 mod show;
+pub mod switch;
 mod update;
 mod which;
 
+use crate::types::BinaryVersion;
 use anyhow::{anyhow, bail, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use comfy_table::Table;
-use crate::types::BinaryVersion;
 pub const TABLE_FORMAT: &str = "  ── ══      ──    ";
 #[derive(Parser)]
 #[command(arg_required_else_help = true, disable_help_subcommand = true)]
@@ -38,6 +39,7 @@ pub enum Commands {
     Self_(self_::Command),
 
     Show(show::Command),
+    Switch(switch::Command),
     Update(update::Command),
     Which(which::Command),
 }
@@ -51,6 +53,7 @@ impl Command {
             Commands::List(cmd) => cmd.exec(&self.github_token).await,
             Commands::Self_(cmd) => cmd.exec().await,
             Commands::Show(cmd) => cmd.exec(),
+            Commands::Switch(cmd) => cmd.exec(),
             Commands::Update(cmd) => cmd.exec(&self.github_token).await,
             Commands::Which(cmd) => cmd.exec(),
         }
