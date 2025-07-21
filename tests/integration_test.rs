@@ -9,6 +9,8 @@ mod tests {
     use anyhow::Result;
     use assert_cmd::Command;
     use predicates::prelude::*;
+    use std::fs;
+    use std::time::{Duration, SystemTime};
     use suiup::paths::installed_binaries_file;
 
     #[cfg(not(windows))]
@@ -359,6 +361,169 @@ mod tests {
         cmd.assert()
             .success()
             .stdout(predicate::str::contains("1.18.2"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_command_help() -> Result<()> {
+        let test_env = TestEnv::new()?;
+
+        let mut cmd = suiup_command(vec!["cleanup", "--help"], &test_env);
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains("Usage: suiup cleanup"))
+            .stdout(predicate::str::contains("--all"))
+            .stdout(predicate::str::contains("--days"))
+            .stdout(predicate::str::contains("--dry-run"))
+            .stdout(predicate::str::contains("Remove all cache files"))
+            .stdout(predicate::str::contains("Days to keep files in cache"));
+
+        Ok(())
+    }
+    #[tokio::test]
+    async fn test_cleanup_dry_run_workflow() -> Result<()> {
+        let test_env = TestEnv::new()?;
+        test_env.initialize_paths()?;
+        test_env.copy_testnet_releases_to_cache()?;
+
+        let cache_dir = test_env.cache_dir.join("suiup").join("releases");
+
+        fs::create_dir_all(&cache_dir)?;
+
+        let old_file = cache_dir.join("old_release.zip");
+        fs::write(&old_file, b"old release content")?;
+
+        // Make the file appear old
+        let old_time = SystemTime::now() - Duration::from_secs(60 * 60 * 24 * 40); // 40 days ago
+        filetime::set_file_mtime(&old_file, filetime::FileTime::from_system_time(old_time))?;
+
+        // Run dry run cleanup
+        let mut cmd = suiup_command(vec!["cleanup", "--dry-run"], &test_env);
+        cmd.assert().success().stdout(predicate::str::contains(
+            "Removing release archives older than 30 days",
+        ));
+
+        // Verify file still exists after dry run
+        assert!(old_file.exists());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_with_days_filter() -> Result<()> {
+        let test_env = TestEnv::new()?;
+        test_env.initialize_paths()?;
+        test_env.copy_testnet_releases_to_cache()?;
+
+        let cache_dir = test_env.cache_dir.join("suiup").join("releases");
+
+        fs::create_dir_all(&cache_dir)?;
+
+        // Create files with different ages
+        let old_file = cache_dir.join("old_file.zip");
+        let recent_file = cache_dir.join("recent_file.zip");
+
+        fs::write(&old_file, b"old content")?;
+        fs::write(&recent_file, b"recent content")?;
+
+        // Make old file 40 days old
+        let old_time = SystemTime::now() - Duration::from_secs(60 * 60 * 24 * 40);
+        filetime::set_file_mtime(&old_file, filetime::FileTime::from_system_time(old_time))?;
+
+        // Run cleanup with 30 days filter
+        let mut cmd = suiup_command(vec!["cleanup", "--days", "30"], &test_env);
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains(
+                "Removing release archives older than 30 days",
+            ))
+            .stdout(predicate::str::contains("Cleanup complete"));
+
+        // Old file should be removed, recent file should remain
+        assert!(!old_file.exists());
+        assert!(recent_file.exists());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_all_files() -> Result<()> {
+        let test_env = TestEnv::new()?;
+        test_env.initialize_paths()?;
+        test_env.copy_testnet_releases_to_cache()?;
+
+        let cache_dir = test_env.cache_dir.join("suiup").join("releases");
+
+        fs::create_dir_all(&cache_dir)?;
+
+        // Create additional test files
+        let file1 = cache_dir.join("test1.zip");
+        let file2 = cache_dir.join("test2.zip");
+
+        fs::write(&file1, b"test content 1")?;
+        fs::write(&file2, b"test content 2")?;
+
+        // Verify files exist before cleanup
+        assert!(file1.exists());
+        assert!(file2.exists());
+
+        // Run cleanup with --all flag
+        let mut cmd = suiup_command(vec!["cleanup", "--all"], &test_env);
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains("Removing all release archives"))
+            .stdout(predicate::str::contains("Cache cleared successfully")); 
+
+        // All files should be removed
+        assert!(!file1.exists());
+        assert!(!file2.exists());
+
+        // But directory should still exist
+        assert!(cache_dir.exists());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_after_install_workflow() -> Result<()> {
+        let test_env = TestEnv::new()?;
+        test_env.initialize_paths()?;
+        test_env.copy_testnet_releases_to_cache()?;
+
+        // Install a component first to create cache files
+        let mut cmd = suiup_command(vec!["install", "sui@testnet-1.39.3", "-y"], &test_env);
+        cmd.assert().success();
+
+        let cache_dir = test_env.cache_dir.join("suiup").join("releases");
+
+        fs::create_dir_all(&cache_dir)?;
+
+        let old_file = cache_dir.join("old_archive.zip");
+        fs::write(&old_file, b"old archive")?;
+        let old_time = SystemTime::now() - Duration::from_secs(60 * 60 * 24 * 40);
+        filetime::set_file_mtime(&old_file, filetime::FileTime::from_system_time(old_time))?;
+
+        // Run cleanup
+        let mut cmd = suiup_command(vec!["cleanup", "--days", "30"], &test_env);
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains("Cleanup complete"));
+
+        // Verify old file is removed
+        assert!(!old_file.exists());
+
+        // Verify installed binary still works
+        #[cfg(windows)]
+        let default_sui_binary = test_env.bin_dir.join("sui.exe");
+        #[cfg(not(windows))]
+        let default_sui_binary = test_env.bin_dir.join("sui");
+
+        let mut cmd = Command::new(default_sui_binary);
+        cmd.arg("--version");
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains("1.39.3"));
 
         Ok(())
     }

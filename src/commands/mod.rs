@@ -9,6 +9,7 @@ mod self_;
 mod show;
 mod update;
 mod which;
+mod cleanup;
 
 use anyhow::{anyhow, bail, Result};
 use clap::{Parser, Subcommand, ValueEnum};
@@ -40,6 +41,7 @@ pub enum Commands {
     Show(show::Command),
     Update(update::Command),
     Which(which::Command),
+    Cleanup(cleanup::Command),
 }
 
 impl Command {
@@ -53,6 +55,7 @@ impl Command {
             Commands::Show(cmd) => cmd.exec(),
             Commands::Update(cmd) => cmd.exec(&self.github_token).await,
             Commands::Which(cmd) => cmd.exec(),
+            Commands::Cleanup(cmd) => cmd.exec(&self.github_token).await,
         }
     }
 }
@@ -91,6 +94,19 @@ pub enum ComponentCommands {
     Remove {
         #[arg(value_enum)]
         binary: BinaryName,
+    },
+    #[command(about = "Cleanup cache files")]
+    Cleanup {
+        /// Remove all cache files
+        /// If not specified, only cache files older than `days` will be removed
+        #[arg(long, conflicts_with = "days")]
+        all: bool,
+        /// Days to keep files in cache (default: 30)
+        #[arg(long, short = 'd', default_value = "30")]
+        days: u32,
+        /// Show what would be removed without actually removing anything
+        #[arg(long, short = 'n')]
+        dry_run: bool,
     },
 }
 

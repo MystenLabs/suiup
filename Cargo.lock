@@ -1552,6 +1552,7 @@ dependencies = [
  "console",
  "dirs",
  "env_logger",
+ "filetime",
  "flate2",
  "futures-util",
  "indicatif",
