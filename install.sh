@@ -263,8 +263,8 @@ install_suiup() {
         tar -xzf "$binary_file" -C "$tmp_dir"
     fi
     
-    # Install to appropriate directory
-    install_dir=$(get_install_dir "$os")
+    # Install to appropriate directory (allow user override via SUIUP_INSTALL_DIR)
+    install_dir="${SUIUP_INSTALL_DIR:-$(get_install_dir "$os")}"
     installed_path="$install_dir/suiup"
     if [ "$os" = "windows" ]; then
         installed_path="$install_dir/suiup.exe"
