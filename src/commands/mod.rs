@@ -103,7 +103,7 @@ pub enum BinaryName {
     Sui,
     #[value(name = "walrus")]
     Walrus,
-    #[value(name = "walrus-sites")]
+    #[value(name = "site-builder")]
     WalrusSites,
 }
 
@@ -129,7 +129,7 @@ impl BinaryName {
             BinaryName::Mvr => "mvr",
             BinaryName::Sui => "sui",
             BinaryName::Walrus => "walrus",
-            BinaryName::WalrusSites => "walrus-sites",
+            BinaryName::WalrusSites => "site-builder",
         }
     }
 }
@@ -140,7 +140,7 @@ impl std::fmt::Display for BinaryName {
             BinaryName::Mvr => write!(f, "mvr"),
             BinaryName::Sui => write!(f, "sui"),
             BinaryName::Walrus => write!(f, "walrus"),
-            BinaryName::WalrusSites => write!(f, "walrus-sites"),
+            BinaryName::WalrusSites => write!(f, "site-builder"),
         }
     }
 }
@@ -153,7 +153,7 @@ impl std::str::FromStr for BinaryName {
             "sui" => Ok(BinaryName::Sui),
             "mvr" => Ok(BinaryName::Mvr),
             "walrus" => Ok(BinaryName::Walrus),
-            "walrus-sites" => Ok(BinaryName::WalrusSites),
+            "site-builder" => Ok(BinaryName::WalrusSites),
             _ => Err(format!("Unknown binary: {}", s)),
         }
     }

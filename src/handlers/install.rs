@@ -49,7 +49,6 @@ pub async fn install_from_release(
     repo: Repo,
     github_token: Option<String>,
 ) -> Result<(), Error> {
-    println!("Name: {name}, Network: {network}, Version Spec: {version_spec:?}, Debug: {debug}, Yes: {yes}");
     let filename = match version_spec {
         Some(version) => {
             download_release_at_version(repo, network, &version, github_token.clone()).await?
