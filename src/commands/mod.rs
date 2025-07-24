@@ -1,6 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+mod clean;
 mod default;
 mod install;
 mod list;
@@ -13,6 +14,7 @@ mod which;
 use anyhow::{anyhow, bail, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use comfy_table::Table;
+use std::str::FromStr;
 use crate::types::BinaryVersion;
 pub const TABLE_FORMAT: &str = "  ── ══      ──    ";
 #[derive(Parser)]
@@ -29,6 +31,7 @@ pub struct Command {
 
 #[derive(Subcommand)]
 pub enum Commands {
+    Clean(clean::Command),
     Default(default::Command),
     Install(install::Command),
     Remove(remove::Command),
@@ -45,6 +48,7 @@ pub enum Commands {
 impl Command {
     pub async fn exec(&self) -> Result<()> {
         match &self.command {
+            Commands::Clean(cmd) => cmd.exec(&self.github_token).await,
             Commands::Default(cmd) => cmd.exec(),
             Commands::Install(cmd) => cmd.exec(&self.github_token).await,
             Commands::Remove(cmd) => cmd.exec(&self.github_token).await,
@@ -59,6 +63,11 @@ impl Command {
 
 #[derive(Subcommand)]
 pub enum ComponentCommands {
+    #[command(about = "Clean cached download files")]
+    Clean {
+        #[arg(short, long, help = "Skip confirmation prompt")]
+        yes: bool,
+    },
     #[command(about = "List available binaries to install")]
     List,
     #[command(about = "Add a binary")]
@@ -169,7 +178,7 @@ pub fn parse_component_with_version(s: &str) -> Result<CommandMetadata, anyhow::
 
     match parts.len() {
         1 => {
-            let component = BinaryName::from_str(parts[0], true)
+            let component = FromStr::from_str(parts[0])
                 .map_err(|_| anyhow!("Invalid binary name: {}. Use `suiup list` to find available binaries to install.", parts[0]))?;
             let (network, version) = parse_version_spec(None)?;
             let component_metadata = CommandMetadata {
@@ -180,7 +189,7 @@ pub fn parse_component_with_version(s: &str) -> Result<CommandMetadata, anyhow::
             Ok(component_metadata)
         }
         2 => {
-            let component = BinaryName::from_str(parts[0], true)
+            let component = FromStr::from_str(parts[0])
                 .map_err(|_| anyhow!("Invalid binary name: {}. Use `suiup list` to find available binaries to install.", parts[0]))?;
             let (network, version) = parse_version_spec(Some(parts[1].to_string()))?;
             let component_metadata = CommandMetadata {

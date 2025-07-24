@@ -1,6 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+mod clean;
 mod install;
 mod list;
 mod remove;
@@ -25,6 +26,7 @@ impl ComponentManager {
     /// Handle component commands
     pub async fn handle_command(&self, cmd: ComponentCommands) -> Result<()> {
         match cmd {
+            ComponentCommands::Clean { yes } => self.clean_cache(yes).await,
             ComponentCommands::List => self.list_components().await,
             ComponentCommands::Add {
                 component,
@@ -73,5 +75,10 @@ impl ComponentManager {
     /// Remove a component
     async fn remove_component(&self, binary: BinaryName) -> Result<()> {
         remove::remove_component(binary).await
+    }
+
+    /// Clean cached files
+    async fn clean_cache(&self, yes: bool) -> Result<()> {
+        clean::clean_component(yes).await
     }
 }
