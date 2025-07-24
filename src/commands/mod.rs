@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod default;
+mod doctor;
 mod install;
 mod list;
 mod remove;
@@ -30,6 +31,7 @@ pub struct Command {
 #[derive(Subcommand)]
 pub enum Commands {
     Default(default::Command),
+    Doctor(doctor::Command),
     Install(install::Command),
     Remove(remove::Command),
     List(list::Command),
@@ -46,6 +48,7 @@ impl Command {
     pub async fn exec(&self) -> Result<()> {
         match &self.command {
             Commands::Default(cmd) => cmd.exec(),
+            Commands::Doctor(cmd) => cmd.exec(&self.github_token).await,
             Commands::Install(cmd) => cmd.exec(&self.github_token).await,
             Commands::Remove(cmd) => cmd.exec(&self.github_token).await,
             Commands::List(cmd) => cmd.exec(&self.github_token).await,
@@ -59,6 +62,8 @@ impl Command {
 
 #[derive(Subcommand)]
 pub enum ComponentCommands {
+    #[command(about = "Run diagnostic checks on the environment")]
+    Doctor,
     #[command(about = "List available binaries to install")]
     List,
     #[command(about = "Add a binary")]
