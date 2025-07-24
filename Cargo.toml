@@ -1,32 +1,32 @@
 [package]
 name = "suiup"
 description = "Sui Tooling Version Manager."
-version = "0.0.3"
+version = "0.0.4"
 edition = "2021"
 
 [dependencies]
 anyhow = "1.0.98"
-clap = { version = "4.5.39", features = ["derive", "env"] }
+clap = { version = "4.5.41", features = ["derive", "env"] }
 clap_complete = "4.5.52"
-console = { version = "0.15.11", features = ["windows-console-colors"] }
+comfy-table = "7.1.4"
+console = { version = "0.16.0", features = ["windows-console-colors"] }
 dirs = "6.0.0"
 env_logger = "0.11.8"
 log = "0.4.27"
-flate2 = "1.1.1"
+flate2 = "1.1.2"
 futures-util = "0.3.31"
-indicatif = "0.17"
+indicatif = "0.18"
 lazy_static = "1.5.0"
 regex = "1.11.1"
-reqwest = { version = "0.12.19", default-features = false, features = ["blocking", "json", "stream", "rustls-tls"] }
-md5 = "0.7"
+md5 = "0.8"
+reqwest = { version = "0.12.22", default-features = false, features = ["blocking", "json", "stream", "rustls-tls"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.140"
 tar = "0.4.44"
 tempfile = "3.20"
-tokio = { version = "1.45.1", features = ["full"] }
+tokio = { version = "1.46.1", features = ["full"] }
 tracing = { version = "0.1.41", features = ["log"] }
-whoami = "1.5.2"
-comfy-table = "7.1.4"
+whoami = "1.6.0"
 
 [dev-dependencies]
 assert_cmd = "2.0"

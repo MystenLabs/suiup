@@ -19,6 +19,8 @@ use std::fs::File;
 use std::io::Read;
 use std::{cmp::min, io::Write, path::PathBuf, time::Instant};
 
+use tracing::debug;
+
 /// Generate helpful error message with network suggestions
 /// Note: This is only applicable for sui and walrus. MVR binary is standalone, not tied to a network.
 fn generate_network_suggestions_error(
@@ -173,6 +175,7 @@ pub async fn download_latest_release(
     github_token: Option<String>,
 ) -> Result<String, anyhow::Error> {
     println!("Downloading release list");
+    debug!("Downloading release list for repo: {repo} and network: {network}");
     let releases = release_list(&repo, github_token.clone()).await?;
 
     let (os, arch) = detect_os_arch()?;
@@ -247,7 +250,7 @@ pub async fn download_file(
                     }
                     hasher.consume(&buffer[..n]);
                 }
-                let result = hasher.compute();
+                let result = hasher.finalize();
                 let local_md5 = format!("{:x}", result);
                 let expected_md5 = std::fs::read_to_string(md5_path)?.trim().to_string();
                 if local_md5 == expected_md5 {
@@ -304,7 +307,7 @@ pub async fn download_file(
             }
             hasher.consume(&buffer[..n]);
         }
-        let result = hasher.compute();
+        let result = hasher.finalize();
         let local_md5 = format!("{:x}", result);
         let expected_md5 = std::fs::read_to_string(md5_path)?.trim().to_string();
         if local_md5 != expected_md5 {
