@@ -7,14 +7,17 @@ mod list;
 mod remove;
 mod self_;
 mod show;
+mod switch;
 mod update;
 mod which;
 mod cleanup;
 
+use crate::types::BinaryVersion;
+use crate::{handlers::self_::check_for_updates, types::BinaryVersion};
+
 use anyhow::{anyhow, bail, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use comfy_table::Table;
-use crate::types::BinaryVersion;
 pub const TABLE_FORMAT: &str = "  ── ══      ──    ";
 #[derive(Parser)]
 #[command(arg_required_else_help = true, disable_help_subcommand = true)]
@@ -26,6 +29,10 @@ pub struct Command {
     /// GitHub API token for authenticated requests (helps avoid rate limits).
     #[arg(long, env = "GITHUB_TOKEN", global = true)]
     pub github_token: Option<String>,
+
+    /// Disable update warnings for suiup itself.
+    #[arg(long, env = "SUIUP_DISABLE_UPDATE_WARNINGS", global = true)]
+    pub disable_update_warnings: bool,
 }
 
 #[derive(Subcommand)]
@@ -39,6 +46,7 @@ pub enum Commands {
     Self_(self_::Command),
 
     Show(show::Command),
+    Switch(switch::Command),
     Update(update::Command),
     Which(which::Command),
     Cleanup(cleanup::Command),
@@ -46,6 +54,11 @@ pub enum Commands {
 
 impl Command {
     pub async fn exec(&self) -> Result<()> {
+        // Check for updates before executing any command (except self update to avoid recursion)
+        if !matches!(self.command, Commands::Self_(_)) && !self.disable_update_warnings {
+            check_for_updates();
+        }
+
         match &self.command {
             Commands::Default(cmd) => cmd.exec(),
             Commands::Install(cmd) => cmd.exec(&self.github_token).await,
@@ -53,6 +66,7 @@ impl Command {
             Commands::List(cmd) => cmd.exec(&self.github_token).await,
             Commands::Self_(cmd) => cmd.exec().await,
             Commands::Show(cmd) => cmd.exec(),
+            Commands::Switch(cmd) => cmd.exec(),
             Commands::Update(cmd) => cmd.exec(&self.github_token).await,
             Commands::Which(cmd) => cmd.exec(),
             Commands::Cleanup(cmd) => cmd.exec(&self.github_token).await,
@@ -113,12 +127,14 @@ pub enum ComponentCommands {
 #[derive(Clone, Debug, PartialEq, Hash, Eq, ValueEnum)]
 #[value(rename_all = "lowercase")]
 pub enum BinaryName {
+    #[value(name = "mvr")]
+    Mvr,
     #[value(name = "sui")]
     Sui,
     #[value(name = "walrus")]
     Walrus,
-    #[value(name = "mvr")]
-    Mvr,
+    #[value(name = "site-builder")]
+    WalrusSites,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -133,15 +149,17 @@ impl BinaryName {
         match self {
             BinaryName::Mvr => "https://github.com/MystenLabs/mvr",
             BinaryName::Walrus => "https://github.com/MystenLabs/walrus",
+            BinaryName::WalrusSites => "https://github.com/MystenLabs/walrus-sites",
             _ => "https://github.com/MystenLabs/sui",
         }
     }
 
     pub fn to_str(&self) -> &str {
         match self {
+            BinaryName::Mvr => "mvr",
             BinaryName::Sui => "sui",
             BinaryName::Walrus => "walrus",
-            BinaryName::Mvr => "mvr",
+            BinaryName::WalrusSites => "site-builder",
         }
     }
 }
@@ -149,9 +167,10 @@ impl BinaryName {
 impl std::fmt::Display for BinaryName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            BinaryName::Mvr => write!(f, "mvr"),
             BinaryName::Sui => write!(f, "sui"),
             BinaryName::Walrus => write!(f, "walrus"),
-            BinaryName::Mvr => write!(f, "mvr"),
+            BinaryName::WalrusSites => write!(f, "site-builder"),
         }
     }
 }
@@ -162,8 +181,9 @@ impl std::str::FromStr for BinaryName {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "sui" => Ok(BinaryName::Sui),
-            "walrus" => Ok(BinaryName::Walrus),
             "mvr" => Ok(BinaryName::Mvr),
+            "walrus" => Ok(BinaryName::Walrus),
+            "site-builder" => Ok(BinaryName::WalrusSites),
             _ => Err(format!("Unknown binary: {}", s)),
         }
     }

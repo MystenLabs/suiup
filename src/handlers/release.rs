@@ -157,3 +157,90 @@ pub async fn last_release_for_network<'a>(
         bail!("No release found for {network}")
     }
 }
+
+/// Find all networks that have a specific version available
+pub fn find_networks_with_version(releases: &[Release], version: &str) -> Vec<String> {
+    let version = ensure_version_prefix(version);
+
+    let networks = ["testnet", "devnet", "mainnet"];
+    let mut available_networks = Vec::new();
+
+    for network in networks {
+        let tag = format!("{}-{}", network, version);
+        if releases
+            .iter()
+            .any(|r| r.assets.iter().any(|a| a.name.contains(&tag)))
+        {
+            available_networks.push(network.to_string());
+        }
+    }
+
+    available_networks
+}
+
+/// Ensures version has 'v' prefix (adds it if missing)
+/// This normalizes towards the GitHub release tag format
+pub fn ensure_version_prefix(version: &str) -> String {
+    if version.starts_with("v") {
+        version.to_string()
+    } else {
+        format!("v{version}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{Asset, Release};
+
+    fn create_test_release(asset_names: Vec<&str>) -> Release {
+        Release {
+            assets: asset_names
+                .into_iter()
+                .map(|name| Asset {
+                    name: name.to_string(),
+                    browser_download_url: format!("https://example.com/{}", name),
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn test_find_networks_with_version() {
+        let releases = vec![
+            create_test_release(vec!["sui-testnet-v1.53.0-linux-x86_64.tgz"]),
+            create_test_release(vec!["sui-devnet-v1.53.0-linux-x86_64.tgz"]),
+            create_test_release(vec!["sui-testnet-v1.52.0-linux-x86_64.tgz"]),
+            create_test_release(vec!["walrus-mainnet-v1.54.0-linux-x86_64.tgz"]),
+        ];
+
+        // Test finding version 1.53.0
+        let networks = find_networks_with_version(&releases, "1.53.0");
+        assert_eq!(networks.len(), 2);
+        assert!(networks.contains(&"testnet".to_string()));
+        assert!(networks.contains(&"devnet".to_string()));
+
+        // Test finding version with 'v' prefix
+        let networks = find_networks_with_version(&releases, "v1.53.0");
+        assert_eq!(networks.len(), 2);
+        assert!(networks.contains(&"testnet".to_string()));
+        assert!(networks.contains(&"devnet".to_string()));
+
+        // Test finding version that doesn't exist
+        let networks = find_networks_with_version(&releases, "1.99.0");
+        assert!(networks.is_empty());
+
+        // Test finding version that exists only in one network
+        let networks = find_networks_with_version(&releases, "1.52.0");
+        assert_eq!(networks.len(), 1);
+        assert!(networks.contains(&"testnet".to_string()));
+    }
+
+    #[test]
+    fn test_ensure_version_prefix() {
+        assert_eq!(ensure_version_prefix("1.53.0"), "v1.53.0");
+        assert_eq!(ensure_version_prefix("v1.53.0"), "v1.53.0");
+        assert_eq!(ensure_version_prefix("0.1.2"), "v0.1.2");
+        assert_eq!(ensure_version_prefix("v2.0.0"), "v2.0.0");
+    }
+}

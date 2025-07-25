@@ -25,6 +25,7 @@ pub mod install;
 pub mod release;
 pub mod self_;
 pub mod show;
+pub mod switch;
 pub mod update;
 pub mod version;
 pub mod which;
@@ -33,7 +34,7 @@ pub mod cleanup;
 pub const RELEASES_ARCHIVES_FOLDER: &str = "releases";
 
 pub fn available_components() -> &'static [&'static str] {
-    &["sui", "walrus", "mvr"]
+    &["sui", "mvr", "walrus", "site-builder"]
 }
 
 // Main component handling function

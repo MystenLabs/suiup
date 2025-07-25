@@ -12,23 +12,26 @@ use std::collections::BTreeMap;
 use crate::commands::print_table;
 
 /// Handles the `show` command
-pub fn handle_show() -> Result<(), Error> {
+pub fn handle_show(default_only: bool) -> Result<(), Error> {
     let default = std::fs::read_to_string(default_file_path()?)?;
     let default: BTreeMap<String, (String, Version, bool)> = serde_json::from_str(&default)?;
     let default_binaries = Binaries::from(default);
 
     // Default binaries table
-
     println!("\x1b[1mDefault binaries:\x1b[0m");
     print_table(&default_binaries.binaries);
 
-    // Installed binaries table
-    let installed_binaries = installed_binaries_grouped_by_network(None)?;
-    let binaries = installed_binaries.into_iter().flat_map(|(_,binaries)| {
-        binaries.to_owned()
-    }).collect();
-    println!("\x1b[1mInstalled binaries:\x1b[0m");
-    print_table(&binaries);
+    // Only show installed binaries if --default flag is not set
+    if !default_only {
+        // Installed binaries table
+        let installed_binaries = installed_binaries_grouped_by_network(None)?;
+        let binaries = installed_binaries
+            .into_iter()
+            .flat_map(|(_, binaries)| binaries.to_owned())
+            .collect();
+        println!("\x1b[1mInstalled binaries:\x1b[0m");
+        print_table(&binaries);
+    }
 
     Ok(())
 }
