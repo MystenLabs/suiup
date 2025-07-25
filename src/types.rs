@@ -29,9 +29,10 @@ impl Repo {
     /// Returns the binary name for this repository
     pub fn binary_name(&self) -> &'static str {
         match self {
+            Repo::Mvr => "mvr",
             Repo::Sui => "sui",
             Repo::Walrus => "walrus",
-            Repo::Mvr => "mvr",
+            Repo::WalrusSites => "site-builder",
         }
     }
 }
