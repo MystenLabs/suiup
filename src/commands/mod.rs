@@ -12,7 +12,6 @@ mod update;
 mod which;
 mod cleanup;
 
-use crate::types::BinaryVersion;
 use crate::{handlers::self_::check_for_updates, types::BinaryVersion};
 
 use anyhow::{anyhow, bail, Result};
