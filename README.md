@@ -138,6 +138,23 @@ suiup --disable-update-warnings show
 export SUIUP_DISABLE_UPDATE_WARNINGS=true
 suiup show
 ```
+### Cleanup cache files
+
+You can use the `cleanup` command to remove old or unnecessary cache files:
+
+```bash
+# Clean files older than 30 days (default)
+suiup cleanup
+
+# Clean files older than 7 days
+suiup cleanup --days 7
+
+# Clean all cache files
+suiup cleanup --all
+
+# Show what would be removed without actually removing
+suiup cleanup --dry-run
+```
 
 # Advanced Usage
 
@@ -215,7 +232,6 @@ The tool uses these environment variables to store data.
 ## Known issues
 - `suiup install mvr --nightly` might fail on **Windows** because of issues with compiling the `mvr-cli` crate from the repository. Just install the latest release instead.
 - `suiup remove` does not work well. Do not use it.
-- There is no cleanup functionality, so the cache might grow bigger.
 ## Troubleshooting
 
 ### `suiup` is not recognized as a command
