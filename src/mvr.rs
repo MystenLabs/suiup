@@ -81,15 +81,15 @@ impl MvrInstaller {
         };
 
         let cache_folder = binaries_dir().join("standalone");
-        if !cache_folder.exists() {
-            std::fs::create_dir_all(&cache_folder)?;
+        if !tokio::fs::try_exists(&cache_folder).await.unwrap_or(false) {
+            tokio::fs::create_dir_all(&cache_folder).await?;
         }
         #[cfg(not(windows))]
         let mvr_binary_path = cache_folder.join(format!("mvr-{}", version));
         #[cfg(target_os = "windows")]
         let mvr_binary_path = cache_folder.join(format!("mvr-{}.exe", version));
 
-        if mvr_binary_path.exists() {
+        if tokio::fs::try_exists(&mvr_binary_path).await.unwrap_or(false) {
             println!("Binary mvr-{version} already installed. Use `suiup default set mvr {version}` to set the default version to the desired one");
             return Ok(version);
         }
@@ -127,9 +127,9 @@ impl MvrInstaller {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let mut perms = std::fs::metadata(&mvr_binary_path)?.permissions();
+            let mut perms = tokio::fs::metadata(&mvr_binary_path).await?.permissions();
             perms.set_mode(0o755);
-            std::fs::set_permissions(&mvr_binary_path, perms)?;
+            tokio::fs::set_permissions(&mvr_binary_path, perms).await?;
         }
 
         Ok(version)

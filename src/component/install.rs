@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, Result};
-use std::fs::create_dir_all;
+use tokio::fs::create_dir_all;
 
 use crate::commands::BinaryName;
 use crate::handlers::install::{install_from_nightly, install_from_release, install_mvr};
@@ -21,10 +21,10 @@ pub async fn install_component(
 ) -> Result<()> {
     // Ensure installation directories exist
     let default_bin_dir = get_default_bin_dir();
-    create_dir_all(&default_bin_dir)?;
+    create_dir_all(&default_bin_dir).await?;
 
     let installed_bins_dir = binaries_dir();
-    create_dir_all(&installed_bins_dir)?;
+    create_dir_all(&installed_bins_dir).await?;
 
     if name != BinaryName::Sui && debug && nightly.is_none() {
         return Err(anyhow!("Debug flag is only available for the `sui` binary"));
@@ -38,7 +38,7 @@ pub async fn install_component(
 
     match (&name, &nightly) {
         (BinaryName::Walrus, nightly) => {
-            create_dir_all(installed_bins_dir.join(network.clone()))?;
+            create_dir_all(installed_bins_dir.join(network.clone())).await?;
             if let Some(branch) = nightly {
                 install_from_nightly(&name, branch, debug, yes).await?;
             } else {
@@ -55,7 +55,7 @@ pub async fn install_component(
             }
         }
         (BinaryName::WalrusSites, nightly) => {
-            create_dir_all(installed_bins_dir.join("mainnet"))?;
+            create_dir_all(installed_bins_dir.join("mainnet")).await?;
             if let Some(branch) = nightly {
                 install_from_nightly(&name, branch, debug, yes).await?;
             } else {
@@ -73,7 +73,7 @@ pub async fn install_component(
         }
 
         (BinaryName::Mvr, nightly) => {
-            create_dir_all(installed_bins_dir.join("standalone"))?;
+            create_dir_all(installed_bins_dir.join("standalone")).await?;
             if let Some(branch) = nightly {
                 install_from_nightly(&name, branch, debug, yes).await?;
             } else {

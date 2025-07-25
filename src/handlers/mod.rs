@@ -14,8 +14,6 @@ use std::{fs::File, io::BufReader};
 use crate::types::{BinaryVersion, InstalledBinaries};
 use std::collections::BTreeMap;
 #[cfg(not(windows))]
-use std::fs::set_permissions;
-#[cfg(not(windows))]
 use std::os::unix::fs::PermissionsExt;
 use tar::Archive;
 use version::extract_version_from_release;
@@ -46,7 +44,8 @@ pub fn update_default_version_file(
     version: &str,
     debug: bool,
 ) -> Result<(), Error> {
-    let path = default_file_path()?;
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let path = rt.block_on(default_file_path())?;
     let file = File::open(&path)?;
     let reader = BufReader::new(file);
     let mut map: BTreeMap<String, (String, Version, bool)> = serde_json::from_reader(reader)?;
@@ -68,6 +67,35 @@ pub fn update_default_version_file(
     let mut file = File::create(path)?;
     file.write_all(serde_json::to_string_pretty(&map)?.as_bytes())?;
 
+    Ok(())
+}
+
+/// Async version of update_default_version_file
+pub async fn update_default_version_file_async(
+    binaries: &Vec<String>,
+    network: String,
+    version: &str,
+    debug: bool,
+) -> Result<(), Error> {
+    let path = default_file_path().await?;
+    let content = tokio::fs::read_to_string(&path).await?;
+    let mut map: BTreeMap<String, (String, Version, bool)> = serde_json::from_str(&content)?;
+
+    for binary in binaries {
+        let b = map.get_mut(binary);
+        if let Some(b) = b {
+            b.0 = network.clone();
+            b.1 = version.to_string();
+            b.2 = debug;
+        } else {
+            map.insert(
+                binary.to_string(),
+                (network.clone(), version.to_string(), debug),
+            );
+        }
+    }
+
+    tokio::fs::write(path, serde_json::to_string_pretty(&map)?).await?;
     Ok(())
 }
 
@@ -153,7 +181,8 @@ pub fn update_after_install(
                 };
 
                 if !binary_folder.exists() {
-                    std::fs::create_dir_all(&binary_folder).map_err(|e| {
+                    let rt = tokio::runtime::Runtime::new().unwrap();
+                    rt.block_on(tokio::fs::create_dir_all(&binary_folder)).map_err(|e| {
                         anyhow!("Cannot create folder {}: {e}", binary_folder.display())
                     })?;
                 }
@@ -259,6 +288,7 @@ fn check_path_and_warn() -> Result<(), Error> {
     Ok(())
 }
 
+
 /// Extracts a component from the release archive. The component's name is identified by the
 /// `binary` parameter.
 ///
@@ -290,7 +320,8 @@ fn extract_component(orig_binary: &str, network: String, filename: &str) -> Resu
             let mut output_path = binaries_dir();
             output_path.push(&network);
             if !output_path.is_dir() {
-                std::fs::create_dir_all(output_path.as_path())?;
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(tokio::fs::create_dir_all(output_path.as_path()))?;
             }
             let version = extract_version_from_release(filename)?;
             let binary_version = format!("{}-{}", orig_binary, version);
@@ -314,13 +345,14 @@ fn extract_component(orig_binary: &str, network: String, filename: &str) -> Resu
             {
                 // Retrieve and apply the original file permissions on Unix-like systems
                 if let Ok(permissions) = f.header().mode() {
-                    set_permissions(output_path, PermissionsExt::from_mode(permissions)).map_err(
-                        |e| {
-                            anyhow!(
-                                "Cannot apply the original file permissions in a unix system: {e}"
-                            )
-                        },
-                    )?;
+                    std::fs::set_permissions(&output_path,
+                        PermissionsExt::from_mode(permissions),
+                    )
+                    .map_err(|e| {
+                        anyhow!(
+                            "Cannot apply the original file permissions in a unix system: {e}"
+                        )
+                    })?;
                 }
             }
             break;
@@ -361,6 +393,29 @@ pub fn installed_binaries_grouped_by_network(
         installed_binaries
     } else {
         InstalledBinaries::new()?
+    };
+    let binaries = installed_binaries.binaries();
+    let mut files_by_folder: BTreeMap<String, Vec<BinaryVersion>> = BTreeMap::new();
+
+    for b in binaries {
+        if let Some(f) = files_by_folder.get_mut(&b.network_release.to_string()) {
+            f.push(b.clone());
+        } else {
+            files_by_folder.insert(b.network_release.to_string(), vec![b.clone()]);
+        }
+    }
+
+    Ok(files_by_folder)
+}
+
+/// Async version of installed_binaries_grouped_by_network
+pub async fn installed_binaries_grouped_by_network_async(
+    installed_binaries: Option<InstalledBinaries>,
+) -> Result<BTreeMap<String, Vec<BinaryVersion>>, Error> {
+    let installed_binaries = if let Some(installed_binaries) = installed_binaries {
+        installed_binaries
+    } else {
+        InstalledBinaries::new_async().await?
     };
     let binaries = installed_binaries.binaries();
     let mut files_by_folder: BTreeMap<String, Vec<BinaryVersion>> = BTreeMap::new();

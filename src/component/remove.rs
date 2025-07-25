@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::collections::HashSet;
-use std::fs::File;
-use std::io::Write;
-use std::path::PathBuf;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 
 use anyhow::{anyhow, Result};
 use tracing::debug;
@@ -15,7 +14,7 @@ use crate::types::InstalledBinaries;
 
 /// Remove a component and its associated files
 pub async fn remove_component(binary: BinaryName) -> Result<()> {
-    let mut installed_binaries = InstalledBinaries::new()?;
+    let mut installed_binaries = InstalledBinaries::new_async().await?;
 
     let binaries_to_remove = installed_binaries
         .binaries()
@@ -33,7 +32,7 @@ pub async fn remove_component(binary: BinaryName) -> Result<()> {
     // Verify all binaries exist before removing any
     for p in &binaries_to_remove {
         if let Some(p) = p.path.as_ref() {
-            if !PathBuf::from(p).exists() {
+            if !tokio::fs::try_exists(p).await.unwrap_or(false) {
                 println!("Binary {p} does not exist. Aborting the command.");
                 return Ok(());
             }
@@ -41,8 +40,9 @@ pub async fn remove_component(binary: BinaryName) -> Result<()> {
     }
 
     // Load default binaries
-    let default_file = default_file_path()?;
-    let default = std::fs::read_to_string(&default_file)
+    let default_file = default_file_path().await?;
+    let default = tokio::fs::read_to_string(&default_file)
+        .await
         .map_err(|_| anyhow!("Cannot read file {}", default_file.display()))?;
     let mut default_binaries: std::collections::BTreeMap<String, (String, String, bool)> =
         serde_json::from_str(&default).map_err(|_| {
@@ -54,7 +54,7 @@ pub async fn remove_component(binary: BinaryName) -> Result<()> {
         if let Some(p) = binary.path.as_ref() {
             println!("Found binary path: {p}");
             debug!("Removing binary: {p}");
-            std::fs::remove_file(p).map_err(|e| anyhow!("Cannot remove file: {e}"))?;
+            tokio::fs::remove_file(p).await.map_err(|e| anyhow!("Cannot remove file: {e}"))?;
             debug!("File removed: {p}");
             println!("Removed binary: {} from {p}", binary.binary_name);
         }
@@ -68,8 +68,9 @@ pub async fn remove_component(binary: BinaryName) -> Result<()> {
 
     for binary in default_binaries_to_remove {
         let default_bin_path = get_default_bin_dir().join(binary);
-        if default_bin_path.exists() {
-            std::fs::remove_file(&default_bin_path)
+        if tokio::fs::try_exists(&default_bin_path).await.unwrap_or(false) {
+            tokio::fs::remove_file(&default_bin_path)
+                .await
                 .map_err(|e| anyhow!("Cannot remove file: {e}"))?;
             debug!(
                 "Removed {} from default binaries folder",
@@ -82,14 +83,15 @@ pub async fn remove_component(binary: BinaryName) -> Result<()> {
     }
 
     // Update default binaries file
-    File::create(&default_file)
-        .map_err(|_| anyhow!("Cannot create file: {}", default_file.display()))?
-        .write_all(serde_json::to_string_pretty(&default_binaries)?.as_bytes())?;
+    let mut file = File::create(&default_file)
+        .await
+        .map_err(|_| anyhow!("Cannot create file: {}", default_file.display()))?;
+    file.write_all(serde_json::to_string_pretty(&default_binaries)?.as_bytes()).await?;
 
     // Update installed binaries metadata
     installed_binaries.remove_binary(&binary.to_string());
     debug!("Removed {binary} from installed_binaries JSON file. Saving updated data");
-    installed_binaries.save_to_file()?;
+    installed_binaries.save_to_file_async().await?;
 
     Ok(())
 }

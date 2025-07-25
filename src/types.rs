@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, Error};
-use std::io::Write;
 use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
+    io::Write,
     path::PathBuf,
     str::FromStr,
 };
@@ -113,22 +113,58 @@ impl InstalledBinaries {
         Ok(())
     }
 
+    pub async fn create_file_async(path: &PathBuf) -> Result<(), Error> {
+        let binaries = InstalledBinaries { binaries: vec![] };
+        let s = serde_json::to_string_pretty(&binaries)
+            .map_err(|e| anyhow!("Cannot serialize the installed binaries to file: {e}"))?;
+        let mut file = tokio::fs::File::create(path).await
+            .map_err(|e| anyhow!("Cannot create this file {}: {e}", path.display()))?;
+        tokio::io::AsyncWriteExt::write_all(&mut file, s.as_bytes()).await
+            .map_err(|e| anyhow!("Cannot write to {}: {e}", path.display()))?;
+        Ok(())
+    }
+
+    pub async fn new_async() -> Result<Self, Error> {
+        Self::read_from_file_async().await
+    }
+
     pub fn new() -> Result<Self, Error> {
         Self::read_from_file()
     }
 
     /// Save the installed binaries data to the installed binaries JSON file
+    pub async fn save_to_file_async(&self) -> Result<(), Error> {
+        let s = serde_json::to_string_pretty(self)
+            .map_err(|e| anyhow!("Cannot read the installed binaries file: {e}"))?;
+        tokio::fs::write(installed_binaries_file().await?, s).await
+            .map_err(|e| anyhow!("Cannot serialize the installed binaries to file: {e}"))?;
+        Ok(())
+    }
+
     pub fn save_to_file(&self) -> Result<(), Error> {
         let s = serde_json::to_string_pretty(self)
             .map_err(|e| anyhow!("Cannot read the installed binaries file: {e}"))?;
-        std::fs::write(installed_binaries_file()?, s)
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let path = rt.block_on(installed_binaries_file())?;
+        std::fs::write(path, s)
             .map_err(|e| anyhow!("Cannot serialize the installed binaries to file: {e}"))?;
         Ok(())
     }
 
     /// Read the installed binaries JSON file
+    pub async fn read_from_file_async() -> Result<Self, Error> {
+        let s = tokio::fs::read_to_string(installed_binaries_file().await?)
+            .await
+            .map_err(|e| anyhow!("Cannot read from the installed binaries file: {e}"))?;
+        let binaries: InstalledBinaries = serde_json::from_str(&s)
+            .map_err(|e| anyhow!("Cannot deserialize from installed binaries file: {e}"))?;
+        Ok(binaries)
+    }
+
     pub fn read_from_file() -> Result<Self, Error> {
-        let s = std::fs::read_to_string(installed_binaries_file()?)
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let path = rt.block_on(installed_binaries_file())?;
+        let s = std::fs::read_to_string(path)
             .map_err(|e| anyhow!("Cannot read from the installed binaries file: {e}"))?;
         let binaries: InstalledBinaries = serde_json::from_str(&s)
             .map_err(|e| anyhow!("Cannot deserialize from installed binaries file: {e}"))?;
@@ -154,8 +190,18 @@ impl InstalledBinaries {
 }
 
 impl DefaultBinaries {
+    pub async fn _load_async() -> Result<DefaultBinaries, Error> {
+        let default_file_path = default_file_path().await?;
+        let file_content = tokio::fs::read_to_string(default_file_path).await?;
+        let default_binaries: DefaultBinaries =
+            serde_json::from_str(&file_content).expect("Cannot deserialize default binaries file");
+
+        Ok(default_binaries)
+    }
+
     pub fn _load() -> Result<DefaultBinaries, Error> {
-        let default_file_path = default_file_path()?;
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let default_file_path = rt.block_on(default_file_path())?;
         let file_content = std::fs::read_to_string(default_file_path)?;
         let default_binaries: DefaultBinaries =
             serde_json::from_str(&file_content).expect("Cannot deserialize default binaries file");

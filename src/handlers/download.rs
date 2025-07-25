@@ -15,9 +15,9 @@ use reqwest::{
     header::{HeaderMap, HeaderValue, USER_AGENT},
     Client,
 };
-use std::fs::File;
-use std::io::Read;
-use std::{cmp::min, io::Write, path::PathBuf, time::Instant};
+use tokio::fs::File;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use std::{cmp::min, path::PathBuf, time::Instant};
 
 use tracing::debug;
 
@@ -235,16 +235,17 @@ pub async fn download_file(
             .unwrap_or(0);
     }
 
-    if download_to.exists() {
-        if download_to.metadata()?.len() == total_size {
+    if tokio::fs::try_exists(download_to).await.unwrap_or(false) {
+        let metadata = tokio::fs::metadata(download_to).await?;
+        if metadata.len() == total_size {
             // Check md5 if .md5 file exists
             let md5_path = download_to.with_extension("md5");
-            if md5_path.exists() {
-                let mut file = File::open(download_to)?;
+            if tokio::fs::try_exists(&md5_path).await.unwrap_or(false) {
+                let mut file = File::open(download_to).await?;
                 let mut hasher = Context::new();
                 let mut buffer = [0u8; 8192];
                 loop {
-                    let n = file.read(&mut buffer)?;
+                    let n = file.read(&mut buffer).await?;
                     if n == 0 {
                         break;
                     }
@@ -252,7 +253,7 @@ pub async fn download_file(
                 }
                 let result = hasher.finalize();
                 let local_md5 = format!("{:x}", result);
-                let expected_md5 = std::fs::read_to_string(md5_path)?.trim().to_string();
+                let expected_md5 = tokio::fs::read_to_string(md5_path).await?.trim().to_string();
                 if local_md5 == expected_md5 {
                     println!("Found {name} in cache, md5 verified");
                     return Ok(name.to_string());
@@ -264,7 +265,7 @@ pub async fn download_file(
                 return Ok(name.to_string());
             }
         }
-        std::fs::remove_file(download_to)?;
+        tokio::fs::remove_file(download_to).await?;
     }
 
     let pb = ProgressBar::new(total_size);
@@ -273,14 +274,14 @@ pub async fn download_file(
         .unwrap()
         .progress_chars("=>-"));
 
-    let mut file = std::fs::File::create(download_to)?;
+    let mut file = tokio::fs::File::create(download_to).await?;
     let mut downloaded: u64 = 0;
     let mut stream = response.bytes_stream();
     let start = Instant::now();
 
     while let Some(item) = stream.next().await {
         let chunk = item?;
-        file.write_all(&chunk)?;
+        file.write_all(&chunk).await?;
         let new = min(downloaded + (chunk.len() as u64), total_size);
         downloaded = new;
         pb.set_position(new);
@@ -296,12 +297,12 @@ pub async fn download_file(
 
     // After download, check md5 if .md5 file exists
     let md5_path = download_to.with_extension("md5");
-    if md5_path.exists() {
-        let mut file = File::open(download_to)?;
+    if tokio::fs::try_exists(&md5_path).await.unwrap_or(false) {
+        let mut file = File::open(download_to).await?;
         let mut hasher = Context::new();
         let mut buffer = [0u8; 8192];
         loop {
-            let n = file.read(&mut buffer)?;
+            let n = file.read(&mut buffer).await?;
             if n == 0 {
                 break;
             }
@@ -309,7 +310,7 @@ pub async fn download_file(
         }
         let result = hasher.finalize();
         let local_md5 = format!("{:x}", result);
-        let expected_md5 = std::fs::read_to_string(md5_path)?.trim().to_string();
+        let expected_md5 = tokio::fs::read_to_string(md5_path).await?.trim().to_string();
         if local_md5 != expected_md5 {
             return Err(anyhow!(format!(
                 "MD5 check failed for {}: expected {}, got {}",

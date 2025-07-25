@@ -18,8 +18,8 @@ use crate::commands::print_table;
 pub struct Command;
 
 impl Command {
-    pub fn exec(&self) -> Result<()> {
-        let default = std::fs::read_to_string(default_file_path()?)?;
+    pub async fn exec(&self) -> Result<()> {
+        let default = tokio::fs::read_to_string(default_file_path().await?).await?;
         let default: BTreeMap<String, (String, Version, bool)> = serde_json::from_str(&default)?;
         let binaries = Binaries::from(default);
 

@@ -1,4 +1,4 @@
-use std::fs;
+use tokio::fs;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
@@ -14,13 +14,13 @@ pub async fn handle_cleanup(all: bool, days: u32, dry_run: bool) -> Result<()> {
         release_archive_dir.display()
     );
 
-    if !release_archive_dir.exists() {
+    if !fs::try_exists(&release_archive_dir).await.unwrap_or(false) {
         println!("Release archives directory does not exist, nothing to clean up.");
         return Ok(());
     }
 
     // Calculate total size before cleanup
-    let total_size_before = calculate_dir_size(&release_archive_dir)?;
+    let total_size_before = calculate_dir_size_async(&release_archive_dir).await?;
     println!(
         "Current cache size: {}",
         format_file_size(total_size_before)
@@ -31,9 +31,9 @@ pub async fn handle_cleanup(all: bool, days: u32, dry_run: bool) -> Result<()> {
             println!("Would remove all release archives in cache directory (dry run)");
         } else {
             println!("Removing all release archives in cache directory...");
-            if release_archive_dir.exists() {
-                fs::remove_dir_all(&release_archive_dir)?;
-                fs::create_dir_all(&release_archive_dir)?;
+            if fs::try_exists(&release_archive_dir).await.unwrap_or(false) {
+                fs::remove_dir_all(&release_archive_dir).await?;
+                fs::create_dir_all(&release_archive_dir).await?;
             }
             println!("{}", "Cache cleared successfully.");
         }
@@ -48,13 +48,12 @@ pub async fn handle_cleanup(all: bool, days: u32, dry_run: bool) -> Result<()> {
     println!("Removing release archives older than {} days...", days);
 
     // Process release_archive_dir
-    if release_archive_dir.exists() {
-        let entries = fs::read_dir(&release_archive_dir)?;
-        for entry in entries {
-            let entry = entry?;
+    if fs::try_exists(&release_archive_dir).await.unwrap_or(false) {
+        let mut entries = fs::read_dir(&release_archive_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.is_file() {
-                if let Ok(metadata) = fs::metadata(&path) {
+                if let Ok(metadata) = entry.metadata().await {
                     if let Ok(modified_time) = metadata.modified() {
                         if let Ok(age) = SystemTime::now().duration_since(modified_time) {
                             // Convert to days for display
@@ -79,7 +78,7 @@ pub async fn handle_cleanup(all: bool, days: u32, dry_run: bool) -> Result<()> {
                                         days_old,
                                         format_file_size(file_size)
                                     );
-                                    fs::remove_file(path)?;
+                                    fs::remove_file(path).await?;
                                 }
                             }
                         }
@@ -114,13 +113,30 @@ pub async fn handle_cleanup(all: bool, days: u32, dry_run: bool) -> Result<()> {
 fn calculate_dir_size(dir: &PathBuf) -> Result<u64> {
     let mut total_size = 0;
     if dir.exists() {
-        for entry in fs::read_dir(dir)? {
+        for entry in std::fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
             if path.is_file() {
-                total_size += fs::metadata(&path)?.len();
+                total_size += std::fs::metadata(&path)?.len();
             } else if path.is_dir() {
                 total_size += calculate_dir_size(&path)?;
+            }
+        }
+    }
+    Ok(total_size)
+}
+
+async fn calculate_dir_size_async(dir: &PathBuf) -> Result<u64> {
+    let mut total_size = 0;
+    if fs::try_exists(dir).await.unwrap_or(false) {
+        let mut entries = fs::read_dir(dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            let path = entry.path();
+            let metadata = entry.metadata().await?;
+            if metadata.is_file() {
+                total_size += metadata.len();
+            } else if metadata.is_dir() {
+                total_size += Box::pin(calculate_dir_size_async(&path)).await?;
             }
         }
     }

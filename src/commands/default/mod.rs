@@ -23,9 +23,10 @@ enum Commands {
 impl Command {
     /// Handles the default commands
     pub fn exec(&self) -> Result<()> {
+        let rt = tokio::runtime::Runtime::new().unwrap();
         match &self.command {
-            Commands::Get(cmd) => cmd.exec(),
-            Commands::Set(cmd) => cmd.exec(),
+            Commands::Get(cmd) => rt.block_on(cmd.exec()),
+            Commands::Set(cmd) => rt.block_on(cmd.exec()),
         }
     }
 }

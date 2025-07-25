@@ -7,7 +7,7 @@ use tracing::{debug, info};
 
 use crate::{
     commands::{parse_component_with_version, BinaryName, CommandMetadata},
-    handlers::{installed_binaries_grouped_by_network, update_default_version_file},
+    handlers::{installed_binaries_grouped_by_network_async, update_default_version_file_async},
     paths::{binaries_dir, get_default_bin_dir},
 };
 
@@ -34,7 +34,7 @@ pub struct Command {
 }
 
 impl Command {
-    pub fn exec(&self) -> Result<()> {
+    pub async fn exec(&self) -> Result<()> {
         let Command {
             name,
             debug,
@@ -64,7 +64,7 @@ impl Command {
         };
 
         // a map of network --> to BinaryVersion
-        let installed_binaries = installed_binaries_grouped_by_network(None)?;
+        let installed_binaries = installed_binaries_grouped_by_network_async(None).await?;
         let binaries = installed_binaries
             .get(network)
             .ok_or_else(|| anyhow!("No binaries installed for {network}"))?;
@@ -145,31 +145,31 @@ impl Command {
 
         #[cfg(not(target_os = "windows"))]
         {
-            if dst.exists() {
-                std::fs::remove_file(&dst)?;
+            if tokio::fs::try_exists(&dst).await.unwrap_or(false) {
+                tokio::fs::remove_file(&dst).await?;
             }
 
-            std::fs::copy(&src, &dst)?;
+            tokio::fs::copy(&src, &dst).await?;
 
             #[cfg(unix)]
             {
-                let mut perms = std::fs::metadata(&dst)?.permissions();
+                let mut perms = tokio::fs::metadata(&dst).await?.permissions();
                 perms.set_mode(0o755);
-                std::fs::set_permissions(&dst, perms)?;
+                tokio::fs::set_permissions(&dst, perms).await?;
             }
         }
 
         #[cfg(target_os = "windows")]
         {
-            std::fs::copy(&src, &dst)?;
+            tokio::fs::copy(&src, &dst).await?;
         }
 
-        update_default_version_file(
+        update_default_version_file_async(
             &vec![name.to_string()],
             network.to_string(),
             &version,
             *debug,
-        )?;
+        ).await?;
 
         println!("Default binary updated successfully");
         Ok(())

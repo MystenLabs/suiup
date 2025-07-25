@@ -4,8 +4,6 @@
 use anyhow::Error;
 use std::collections::BTreeMap;
 use std::env;
-use std::fs::{create_dir_all, File};
-use std::io::Write;
 use std::path::PathBuf;
 
 use crate::handlers::RELEASES_ARCHIVES_FOLDER;
@@ -114,9 +112,6 @@ pub fn get_default_bin_dir() -> PathBuf {
     {
         let mut path = PathBuf::from(env::var_os("LOCALAPPDATA").expect("LOCALAPPDATA not set"));
         path.push("bin");
-        if !path.exists() {
-            std::fs::create_dir_all(&path).unwrap();
-        }
         path
     }
 
@@ -138,23 +133,23 @@ pub fn get_config_file(name: &str) -> PathBuf {
 }
 
 /// Returns the path to the default version file
-pub fn default_file_path() -> Result<PathBuf, Error> {
+pub async fn default_file_path() -> Result<PathBuf, Error> {
     let path = get_config_file("default_version.json");
-    if !path.exists() {
-        let mut file = File::create(&path)?;
+    if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
+        let mut file = tokio::fs::File::create(&path).await?;
         let default = BTreeMap::<String, (String, String)>::new();
         let default_str = serde_json::to_string_pretty(&default)?;
-        file.write_all(default_str.as_bytes())?;
+        tokio::io::AsyncWriteExt::write_all(&mut file, default_str.as_bytes()).await?;
     }
     Ok(path)
 }
 
 /// Returns the path to the installed binaries file
-pub fn installed_binaries_file() -> Result<PathBuf, Error> {
+pub async fn installed_binaries_file() -> Result<PathBuf, Error> {
     let path = get_config_file("installed_binaries.json");
-    if !path.exists() {
+    if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
         // We'll need to adjust this reference after moving more code
-        InstalledBinaries::create_file(&path)?;
+        InstalledBinaries::create_file_async(&path).await?;
     }
     Ok(path)
 }
@@ -168,14 +163,19 @@ pub fn binaries_dir() -> PathBuf {
     get_suiup_data_dir().join("binaries")
 }
 
-pub fn initialize() -> Result<(), Error> {
-    create_dir_all(get_suiup_config_dir())?;
-    create_dir_all(get_suiup_data_dir())?;
-    create_dir_all(get_suiup_cache_dir())?;
-    create_dir_all(binaries_dir())?;
-    create_dir_all(release_archive_dir())?;
-    create_dir_all(get_default_bin_dir())?;
-    default_file_path()?;
-    installed_binaries_file()?;
+pub async fn initialize() -> Result<(), Error> {
+    tokio::fs::create_dir_all(get_suiup_config_dir()).await?;
+    tokio::fs::create_dir_all(get_suiup_data_dir()).await?;
+    tokio::fs::create_dir_all(get_suiup_cache_dir()).await?;
+    tokio::fs::create_dir_all(binaries_dir()).await?;
+    tokio::fs::create_dir_all(release_archive_dir()).await?;
+    
+    let default_bin_dir = get_default_bin_dir();
+    if !tokio::fs::try_exists(&default_bin_dir).await.unwrap_or(false) {
+        tokio::fs::create_dir_all(&default_bin_dir).await?;
+    }
+    
+    default_file_path().await?;
+    installed_binaries_file().await?;
     Ok(())
 }

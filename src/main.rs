@@ -8,7 +8,7 @@ use suiup::paths::initialize;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
-    initialize()?;
+    initialize().await?;
 
     let cmd = Command::parse();
     if let Err(err) = cmd.exec().await {

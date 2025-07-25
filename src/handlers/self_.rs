@@ -10,7 +10,6 @@ use tokio::task;
 
 use flate2::read::GzDecoder;
 use serde::Deserialize;
-use std::fs::File;
 use tar::Archive;
 
 #[derive(Debug, Deserialize)]
@@ -153,7 +152,7 @@ pub async fn handle_update() -> Result<()> {
     download_file(&url, &temp_dir.path().join(archive_name), "suiup", None).await?;
 
     // extract the archive
-    let file = File::open(archive_path.as_path())
+    let file = std::fs::File::open(archive_path.as_path())
         .map_err(|_| anyhow!("Cannot open archive file: {}", archive_path.display()))?;
     let tar = GzDecoder::new(file);
     let mut archive = Archive::new(tar);
@@ -168,7 +167,7 @@ pub async fn handle_update() -> Result<()> {
 
     // replace the current binary with the new one
     let binary_path = temp_dir.path().join(binary);
-    std::fs::copy(binary_path, current_exe)?;
+    tokio::fs::copy(binary_path, current_exe).await?;
 
     println!("suiup updated to version {}", latest_version);
     // cleanup
@@ -176,15 +175,20 @@ pub async fn handle_update() -> Result<()> {
     Ok(())
 }
 
-pub fn handle_uninstall() -> Result<()> {
+pub async fn handle_uninstall_async() -> Result<()> {
     let current_exe = std::env::current_exe()?;
-    if current_exe.exists() {
-        std::fs::remove_file(current_exe)?;
+    if tokio::fs::try_exists(&current_exe).await.unwrap_or(false) {
+        tokio::fs::remove_file(current_exe).await?;
         println!("suiup uninstalled");
     } else {
         println!("suiup is not installed");
     }
     Ok(())
+}
+
+pub fn handle_uninstall() -> Result<()> {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(handle_uninstall_async())
 }
 
 fn find_archive_name() -> Result<String> {
