@@ -10,8 +10,8 @@ use crate::paths::{get_suiup_data_dir, get_default_bin_dir, installed_binaries_f
 use crate::types::InstalledBinaries;
 
 pub async fn run_doctor_checks() -> Result<()> {
-    println!("\n{}", "Suiup Environment Doctor".bold().cyan());
-    println!("{}", "------------------------".cyan());
+    println!("\n{}", "Suiup Environment Doctor".bold());
+    println!("{}", "------------------------");
 
     let mut warnings = 0;
     let mut errors = 0;
