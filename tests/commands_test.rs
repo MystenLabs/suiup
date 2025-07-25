@@ -5,6 +5,7 @@
 mod tests {
     use anyhow::Result;
     use suiup::commands::{parse_component_with_version, BinaryName, CommandMetadata};
+    use suiup::handlers::switch::parse_binary_spec;
 
     #[test]
     fn test_parse_component_with_version() -> Result<(), anyhow::Error> {
@@ -55,5 +56,43 @@ mod tests {
         assert_eq!(BinaryName::Sui.to_string(), "sui");
         assert_eq!(BinaryName::Mvr.to_string(), "mvr");
         assert_eq!(BinaryName::Walrus.to_string(), "walrus");
+    }
+
+    #[test]
+    fn test_parse_binary_spec() -> Result<()> {
+        // Test valid format
+        let result = parse_binary_spec("sui@testnet")?;
+        assert_eq!(result, ("sui".to_string(), "testnet".to_string()));
+
+        let result = parse_binary_spec("mvr@main")?;
+        assert_eq!(result, ("mvr".to_string(), "main".to_string()));
+
+        let result = parse_binary_spec("walrus@devnet")?;
+        assert_eq!(result, ("walrus".to_string(), "devnet".to_string()));
+
+        // Test invalid formats
+        let result = parse_binary_spec("sui");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Invalid format"));
+
+        let result = parse_binary_spec("sui@");
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Binary name and network/release cannot be empty"));
+
+        let result = parse_binary_spec("@testnet");
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Binary name and network/release cannot be empty"));
+
+        let result = parse_binary_spec("sui@testnet@extra");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Invalid format"));
+
+        Ok(())
     }
 }
