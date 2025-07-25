@@ -29,6 +29,7 @@ pub mod switch;
 pub mod update;
 pub mod version;
 pub mod which;
+pub mod cleanup;
 
 pub const RELEASES_ARCHIVES_FOLDER: &str = "releases";
 

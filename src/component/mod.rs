@@ -39,6 +39,7 @@ impl ComponentManager {
                     .await
             }
             ComponentCommands::Remove { binary } => self.remove_component(binary).await,
+            ComponentCommands::Cleanup { all, days, dry_run } => self.handle_cleanup(all, days, dry_run).await
         }
     }
 
@@ -80,5 +81,10 @@ impl ComponentManager {
     /// Run diagnostic checks on the environment
     pub async fn run_doctor_checks(&self) -> Result<()> {
         doctor::run_doctor_checks().await
+    }
+
+    /// Handle cleanup operations
+    async fn handle_cleanup(&self, all: bool, days: u32, dry_run: bool) -> Result<()> {
+        crate::handlers::cleanup::handle_cleanup(all, days, dry_run).await
     }
 }

@@ -11,8 +11,8 @@ mod show;
 mod switch;
 mod update;
 mod which;
+mod cleanup;
 
-use crate::types::BinaryVersion;
 use crate::{handlers::self_::check_for_updates, types::BinaryVersion};
 
 use anyhow::{anyhow, bail, Result};
@@ -50,6 +50,7 @@ pub enum Commands {
     Switch(switch::Command),
     Update(update::Command),
     Which(which::Command),
+    Cleanup(cleanup::Command),
 }
 
 impl Command {
@@ -70,6 +71,7 @@ impl Command {
             Commands::Switch(cmd) => cmd.exec(),
             Commands::Update(cmd) => cmd.exec(&self.github_token).await,
             Commands::Which(cmd) => cmd.exec(),
+            Commands::Cleanup(cmd) => cmd.exec(&self.github_token).await,
         }
     }
 }
@@ -110,6 +112,19 @@ pub enum ComponentCommands {
     Remove {
         #[arg(value_enum)]
         binary: BinaryName,
+    },
+    #[command(about = "Cleanup cache files")]
+    Cleanup {
+        /// Remove all cache files
+        /// If not specified, only cache files older than `days` will be removed
+        #[arg(long, conflicts_with = "days")]
+        all: bool,
+        /// Days to keep files in cache (default: 30)
+        #[arg(long, short = 'd', default_value = "30")]
+        days: u32,
+        /// Show what would be removed without actually removing anything
+        #[arg(long, short = 'n')]
+        dry_run: bool,
     },
 }
 
