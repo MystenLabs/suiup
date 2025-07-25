@@ -222,7 +222,7 @@ async fn check_network_connectivity(check: &mut impl FnMut(&str, Result<String, 
 
     match client
         .get("https://api.github.com")
-        .header("User-Agent", "suiup") // 必须添加
+        .header("User-Agent", "suiup")
         .send()
         .await
     {
@@ -233,5 +233,98 @@ async fn check_network_connectivity(check: &mut impl FnMut(&str, Result<String, 
             "GitHub API connectivity",
             Err("ERROR: Cannot connect to GitHub API. Downloads will fail.".to_string()),
         ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_check_suiup_data_dir_exists() {
+        let temp_dir = TempDir::new().unwrap();
+        let data_dir = temp_dir.path();
+        fs::create_dir_all(data_dir.join("suiup")).unwrap();
+
+        // Temporarily set the data dir to our temp dir to control where get_suiup_data_dir looks.
+        let original_data_home;
+        #[cfg(windows)]
+        {
+            original_data_home = std::env::var("LOCALAPPDATA");
+            std::env::set_var("LOCALAPPDATA", data_dir.to_str().unwrap());
+        }
+        #[cfg(not(windows))]
+        {
+            original_data_home = std::env::var("XDG_DATA_HOME");
+            std::env::set_var("XDG_DATA_HOME", data_dir.to_str().unwrap());
+        }
+
+        let result = check_suiup_data_dir();
+        assert!(result.is_ok());
+        assert!(result.unwrap().contains("at"));
+
+        // Restore original env var
+        #[cfg(windows)]
+        {
+            if let Ok(val) = original_data_home {
+                std::env::set_var("LOCALAPPDATA", val);
+            } else {
+                std::env::remove_var("LOCALAPPDATA");
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            if let Ok(val) = original_data_home {
+                std::env::set_var("XDG_DATA_HOME", val);
+            } else {
+                std::env::remove_var("XDG_DATA_HOME");
+            }
+        }
+    }
+
+    #[test]
+    fn test_check_suiup_data_dir_not_found() {
+        let temp_dir = TempDir::new().unwrap();
+        let data_dir = temp_dir.path();
+
+        // Temporarily set the data dir to our temp dir to control where get_suiup_data_dir looks.
+        let original_data_home;
+        #[cfg(windows)]
+        {
+            original_data_home = std::env::var("LOCALAPPDATA");
+            std::env::set_var("LOCALAPPDATA", data_dir.to_str().unwrap());
+        }
+        #[cfg(not(windows))]
+        {
+            original_data_home = std::env::var("XDG_DATA_HOME");
+            std::env::set_var("XDG_DATA_HOME", data_dir.to_str().unwrap());
+        }
+
+        let path = crate::paths::get_suiup_data_dir();
+        println!("Testing path: {}", path.display());
+        println!("Path exists: {}", path.exists());
+        let result = check_suiup_data_dir();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("suiup data directory not found"));
+
+        // Restore original env var
+        #[cfg(windows)]
+        {
+            if let Ok(val) = original_data_home {
+                std::env::set_var("LOCALAPPDATA", val);
+            } else {
+                std::env::remove_var("LOCALAPPDATA");
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            if let Ok(val) = original_data_home {
+                std::env::set_var("XDG_DATA_HOME", val);
+            } else {
+                std::env::remove_var("XDG_DATA_HOME");
+            }
+        }
     }
 }
