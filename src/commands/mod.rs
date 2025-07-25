@@ -12,7 +12,7 @@ mod update;
 mod which;
 
 use crate::types::BinaryVersion;
-use crate::{handlers::self_::check_for_updates, types::BinaryVersion};
+use crate::handlers::self_::check_for_updates;
 
 use anyhow::{anyhow, bail, Result};
 use clap::{Parser, Subcommand, ValueEnum};
