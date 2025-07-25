@@ -1,21 +1,99 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::handlers::release::find_last_release_by_network;
+use crate::handlers::release::{
+    ensure_version_prefix, find_last_release_by_network, find_networks_with_version,
+};
 use crate::handlers::version::extract_version_from_release;
 use crate::types::Repo;
 use crate::{handlers::release::release_list, paths::release_archive_dir, types::Release};
 use anyhow::{anyhow, bail, Error};
 use futures_util::StreamExt;
 use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
+use md5::Context;
 use reqwest::{
     header::{HeaderMap, HeaderValue, USER_AGENT},
     Client,
 };
-use std::{cmp::min, io::Write, path::PathBuf, time::Instant};
 use std::fs::File;
 use std::io::Read;
-use md5::Context;
+use std::{cmp::min, io::Write, path::PathBuf, time::Instant};
+
+use tracing::debug;
+
+/// Generate helpful error message with network suggestions
+/// Note: This is only applicable for sui and walrus. MVR binary is standalone, not tied to a network.
+fn generate_network_suggestions_error(
+    repo: &Repo,
+    releases: &[Release],
+    version: Option<&str>,
+    requested_network: &str,
+) -> anyhow::Error {
+    let binary_name = repo.binary_name();
+
+    // MVR is a standalone binary, not tied to networks like sui and walrus
+    if matches!(repo, Repo::Mvr) {
+        if let Some(version) = version {
+            return anyhow!(
+                "MVR version {} not found. MVR is a standalone binary - try: suiup install mvr {}",
+                version,
+                version
+            );
+        } else {
+            return anyhow!(
+                "MVR release not found. MVR is a standalone binary - try: suiup install mvr"
+            );
+        }
+    }
+
+    if let Some(version) = version {
+        // For specific version requests, check if version exists in other networks
+        let available_networks = find_networks_with_version(releases, version);
+
+        if !available_networks.is_empty() {
+            let suggestions: Vec<String> = available_networks
+                .iter()
+                .map(|net| format!("suiup install {}@{}-{}", binary_name, net, version))
+                .collect();
+
+            anyhow!(
+                "Release {}-{} not found. However, version {} is available for other networks:\n\nTry one of these commands:\n  {}",
+                requested_network,
+                version,
+                version,
+                suggestions.join("\n  ")
+            )
+        } else {
+            anyhow!("Release {}-{} not found", requested_network, version)
+        }
+    } else {
+        // For latest release requests, check what networks are available
+        let available_networks: Vec<String> = ["testnet", "devnet", "mainnet"]
+            .iter()
+            .filter(|&net| {
+                releases
+                    .iter()
+                    .any(|r| r.assets.iter().any(|a| a.name.contains(net)))
+            })
+            .map(|s| s.to_string())
+            .collect();
+
+        if !available_networks.is_empty() {
+            let suggestions: Vec<String> = available_networks
+                .iter()
+                .map(|net| format!("suiup install {}@{}", binary_name, net))
+                .collect();
+
+            anyhow!(
+                "No releases found for {} network. Available networks:\n\nTry one of these commands:\n  {}",
+                requested_network,
+                suggestions.join("\n  ")
+            )
+        } else {
+            anyhow!("Could not find any releases")
+        }
+    }
+}
 
 /// Detects the current OS and architecture
 pub fn detect_os_arch() -> Result<(String, String), Error> {
@@ -46,12 +124,8 @@ pub async fn download_release_at_version(
 ) -> Result<String, anyhow::Error> {
     let (os, arch) = detect_os_arch()?;
 
-    // releases on GitHub are prefixed with `v` before the major.minor.patch version
-    let version = if version.starts_with("v") {
-        version.to_string()
-    } else {
-        format!("v{version}")
-    };
+    // Ensure version has 'v' prefix for GitHub release tags
+    let version = ensure_version_prefix(version);
 
     let tag = format!("{}-{}", network, version);
 
@@ -81,7 +155,12 @@ pub async fn download_release_at_version(
         let response = client.get(&url).headers(headers).send().await?;
 
         if !response.status().is_success() {
-            bail!("release {tag} not found");
+            return Err(generate_network_suggestions_error(
+                &repo,
+                &releases,
+                Some(&version),
+                network,
+            ));
         }
 
         let release: Release = response.json().await?;
@@ -96,13 +175,14 @@ pub async fn download_latest_release(
     github_token: Option<String>,
 ) -> Result<String, anyhow::Error> {
     println!("Downloading release list");
+    debug!("Downloading release list for repo: {repo} and network: {network}");
     let releases = release_list(&repo, github_token.clone()).await?;
 
     let (os, arch) = detect_os_arch()?;
 
-    let last_release = find_last_release_by_network(releases.0, network)
+    let last_release = find_last_release_by_network(releases.0.clone(), network)
         .await
-        .ok_or_else(|| anyhow!("Could not find last release"))?;
+        .ok_or_else(|| generate_network_suggestions_error(&repo, &releases.0, None, network))?;
 
     println!(
         "Last {network} release: {}",
@@ -165,10 +245,12 @@ pub async fn download_file(
                 let mut buffer = [0u8; 8192];
                 loop {
                     let n = file.read(&mut buffer)?;
-                    if n == 0 { break; }
+                    if n == 0 {
+                        break;
+                    }
                     hasher.consume(&buffer[..n]);
                 }
-                let result = hasher.compute();
+                let result = hasher.finalize();
                 let local_md5 = format!("{:x}", result);
                 let expected_md5 = std::fs::read_to_string(md5_path)?.trim().to_string();
                 if local_md5 == expected_md5 {
@@ -220,14 +302,19 @@ pub async fn download_file(
         let mut buffer = [0u8; 8192];
         loop {
             let n = file.read(&mut buffer)?;
-            if n == 0 { break; }
+            if n == 0 {
+                break;
+            }
             hasher.consume(&buffer[..n]);
         }
-        let result = hasher.compute();
+        let result = hasher.finalize();
         let local_md5 = format!("{:x}", result);
         let expected_md5 = std::fs::read_to_string(md5_path)?.trim().to_string();
         if local_md5 != expected_md5 {
-            return Err(anyhow!(format!("MD5 check failed for {}: expected {}, got {}", name, expected_md5, local_md5)));
+            return Err(anyhow!(format!(
+                "MD5 check failed for {}: expected {}, got {}",
+                name, expected_md5, local_md5
+            )));
         } else {
             println!("MD5 check passed for {name}");
         }
@@ -258,4 +345,85 @@ async fn download_asset_from_github(
     file_path.push(&asset.name);
 
     download_file(&url, &file_path, &name, github_token).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{Asset, Release};
+
+    fn create_test_release(asset_names: Vec<&str>) -> Release {
+        Release {
+            assets: asset_names
+                .into_iter()
+                .map(|name| Asset {
+                    name: name.to_string(),
+                    browser_download_url: format!("https://example.com/{}", name),
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn test_binary_name() {
+        assert_eq!(Repo::Sui.binary_name(), "sui");
+        assert_eq!(Repo::Walrus.binary_name(), "walrus");
+        assert_eq!(Repo::Mvr.binary_name(), "mvr");
+    }
+
+    #[test]
+    fn test_generate_network_suggestions_error_with_version() {
+        let releases = vec![
+            create_test_release(vec!["sui-devnet-v1.53.0-linux-x86_64.tgz"]),
+            create_test_release(vec!["sui-mainnet-v1.53.0-linux-x86_64.tgz"]),
+        ];
+
+        let error =
+            generate_network_suggestions_error(&Repo::Sui, &releases, Some("1.53.0"), "testnet");
+        let error_msg = error.to_string();
+
+        assert!(error_msg.contains("Release testnet-1.53.0 not found"));
+        assert!(error_msg.contains("version 1.53.0 is available for other networks"));
+        assert!(error_msg.contains("suiup install sui@devnet-1.53.0"));
+        assert!(error_msg.contains("suiup install sui@mainnet-1.53.0"));
+    }
+
+    #[test]
+    fn test_generate_network_suggestions_error_without_version() {
+        let releases = vec![
+            create_test_release(vec!["sui-devnet-v1.53.0-linux-x86_64.tgz"]),
+            create_test_release(vec!["walrus-mainnet-v1.54.0-linux-x86_64.tgz"]),
+        ];
+
+        let error = generate_network_suggestions_error(&Repo::Sui, &releases, None, "testnet");
+        let error_msg = error.to_string();
+
+        assert!(error_msg.contains("No releases found for testnet network"));
+        assert!(error_msg.contains("Available networks"));
+        assert!(error_msg.contains("suiup install sui@devnet"));
+        assert!(error_msg.contains("suiup install sui@mainnet"));
+    }
+
+    #[test]
+    fn test_generate_network_suggestions_error_mvr_with_version() {
+        let releases = vec![];
+        let error =
+            generate_network_suggestions_error(&Repo::Mvr, &releases, Some("1.0.0"), "standalone");
+        let error_msg = error.to_string();
+
+        assert!(error_msg.contains("MVR version 1.0.0 not found"));
+        assert!(error_msg.contains("MVR is a standalone binary"));
+        assert!(error_msg.contains("suiup install mvr 1.0.0"));
+    }
+
+    #[test]
+    fn test_generate_network_suggestions_error_mvr_without_version() {
+        let releases = vec![];
+        let error = generate_network_suggestions_error(&Repo::Mvr, &releases, None, "standalone");
+        let error_msg = error.to_string();
+
+        assert!(error_msg.contains("MVR release not found"));
+        assert!(error_msg.contains("MVR is a standalone binary"));
+        assert!(error_msg.contains("suiup install mvr"));
+    }
 }

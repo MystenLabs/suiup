@@ -54,6 +54,24 @@ pub async fn install_component(
                 .await?;
             }
         }
+        (BinaryName::WalrusSites, nightly) => {
+            create_dir_all(installed_bins_dir.join("mainnet"))?;
+            if let Some(branch) = nightly {
+                install_from_nightly(&name, branch, debug, yes).await?;
+            } else {
+                install_from_release(
+                    name.to_string().as_str(),
+                    "mainnet",
+                    version,
+                    debug,
+                    yes,
+                    Repo::WalrusSites,
+                    github_token,
+                )
+                .await?;
+            }
+        }
+
         (BinaryName::Mvr, nightly) => {
             create_dir_all(installed_bins_dir.join("standalone"))?;
             if let Some(branch) = nightly {

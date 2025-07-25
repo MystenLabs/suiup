@@ -362,4 +362,161 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_show_default_flag() -> Result<()> {
+        let test_env = TestEnv::new()?;
+        test_env.initialize_paths()?;
+
+        // Test show without --default flag (should show both default and installed)
+        let mut cmd = suiup_command(vec!["show"], &test_env);
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains("Default binaries:"))
+            .stdout(predicate::str::contains("Installed binaries:"));
+
+        // Test show with --default flag (should only show default binaries)
+        let mut cmd = suiup_command(vec!["show", "--default"], &test_env);
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains("Default binaries:"))
+            .stdout(predicate::str::contains("Installed binaries:").not());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_switch_command_basic() -> Result<()> {
+        let test_env = TestEnv::new()?;
+        test_env.initialize_paths()?;
+
+        // Test switch with non-existent binary (should fail gracefully)
+        let mut cmd = suiup_command(vec!["switch", "sui@testnet"], &test_env);
+        cmd.assert()
+            .failure()
+            .stderr(predicate::str::contains("No installed binary found"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_switch_command_error_cases() -> Result<()> {
+        let test_env = TestEnv::new()?;
+        test_env.initialize_paths()?;
+
+        // Test invalid format (missing @)
+        let mut cmd = suiup_command(vec!["switch", "sui"], &test_env);
+        cmd.assert()
+            .failure()
+            .stderr(predicate::str::contains("Invalid format"));
+
+        // Test invalid format (empty parts)
+        let mut cmd = suiup_command(vec!["switch", "sui@"], &test_env);
+        cmd.assert().failure().stderr(predicate::str::contains(
+            "Binary name and network/release cannot be empty",
+        ));
+
+        // Test non-existent binary
+        let mut cmd = suiup_command(vec!["switch", "sui@nonexistent"], &test_env);
+        cmd.assert()
+            .failure()
+            .stderr(predicate::str::contains("No installed binary found"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_switch_command_help() -> Result<()> {
+        let test_env = TestEnv::new()?;
+        test_env.initialize_paths()?;
+
+        // Test switch command help
+        let mut cmd = suiup_command(vec!["switch", "--help"], &test_env);
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains(
+                "Switch to a different version of an installed binary",
+            ))
+            .stdout(predicate::str::contains("BINARY_SPEC"))
+            .stdout(predicate::str::contains("sui@testnet"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_switch_workflow() -> Result<()> {
+        let test_env = TestEnv::new()?;
+        test_env.initialize_paths()?;
+        test_env.copy_testnet_releases_to_cache()?;
+
+        // Install first version (1.39.3)
+        let mut cmd = suiup_command(vec!["install", "sui@testnet-1.39.3", "-y"], &test_env);
+        #[cfg(windows)]
+        let assert_string = "'sui.exe' extracted successfully!";
+        #[cfg(not(windows))]
+        let assert_string = "'sui' extracted successfully!";
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains(assert_string));
+
+        // Verify first version is set as default
+        #[cfg(windows)]
+        let default_sui_binary = test_env.bin_dir.join("sui.exe");
+        #[cfg(not(windows))]
+        let default_sui_binary = test_env.bin_dir.join("sui");
+
+        let mut cmd = Command::new(&default_sui_binary);
+        cmd.arg("--version");
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains("1.39.3"));
+
+        // Install second version (1.40.1)
+        let mut cmd = suiup_command(vec!["install", "sui@testnet-1.40.1", "-y"], &test_env);
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains(assert_string));
+
+        // Verify second version is now default
+        let mut cmd = Command::new(&default_sui_binary);
+        cmd.arg("--version");
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains("1.40.1"));
+
+        // Use switch command to go back to testnet (should pick latest, which is 1.40.1)
+        let mut cmd = suiup_command(vec!["switch", "sui@testnet"], &test_env);
+        cmd.assert().success().stdout(predicate::str::contains(
+            "Successfully switched to sui-v1.40.1 from testnet",
+        ));
+
+        // Verify switch command maintained the default (since it picked the latest)
+        let mut cmd = Command::new(&default_sui_binary);
+        cmd.arg("--version");
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains("1.40.1"));
+
+        // Verify default get shows correct info
+        let mut cmd = suiup_command(vec!["default", "get"], &test_env);
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains("sui"))
+            .stdout(predicate::str::contains("testnet"));
+
+        // Test show command with and without --default flag
+        let mut cmd = suiup_command(vec!["show"], &test_env);
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains("Default binaries:"))
+            .stdout(predicate::str::contains("Installed binaries:"));
+
+        let mut cmd = suiup_command(vec!["show", "--default"], &test_env);
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains("Default binaries:"))
+            .stdout(predicate::str::contains("Installed binaries:").not());
+
+        Ok(())
+    }
 }
