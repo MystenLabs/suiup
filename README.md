@@ -11,7 +11,7 @@ As new tools like [mvr](https://docs.suins.io/move-registry#using-mvr) and [walr
 
 With `suiup`, you can:
 
-- Install specific versions of `sui`, `mvr`, or `walrus` (with more tools coming soon)
+- Install specific versions of `sui`, `mvr`, `walrus`, or `site-builder (walrus-sites)` (with more tools coming soon)
 - Install from a branch in the repository to try unreleased features or fixes
 - Get debug builds of `sui` (needed for commands like `sui move test --coverage`)
 - List and switch between installed binaries for different networks (e.g., devnet vs mainnet)
@@ -126,6 +126,17 @@ suiup default set sui@testnet-1.40.0 --debug # set the default version to be the
 ### Show where the default binaries are installed
 ```bash
 suiup which
+```
+
+### Disable update warnings
+If you find the update warnings annoying, you can disable them:
+```bash
+# Using command line flag
+suiup --disable-update-warnings show
+
+# Using environment variable
+export SUIUP_DISABLE_UPDATE_WARNINGS=true
+suiup show
 ```
 
 # Advanced Usage
