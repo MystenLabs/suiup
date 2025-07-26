@@ -156,6 +156,14 @@ suiup cleanup --all
 suiup cleanup --dry-run
 ```
 
+### Diagnose environment issues
+
+You can use the `doctor` command to check for common environment issues.
+
+```bash
+suiup doctor
+```
+
 # Advanced Usage
 
 ### Pre-requisites
