@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod default;
+mod doctor;
 mod install;
 mod list;
 mod remove;
@@ -10,8 +11,8 @@ mod show;
 mod switch;
 mod update;
 mod which;
+mod cleanup;
 
-use crate::types::BinaryVersion;
 use crate::{handlers::self_::check_for_updates, types::BinaryVersion};
 
 use anyhow::{anyhow, bail, Result};
@@ -37,6 +38,7 @@ pub struct Command {
 #[derive(Subcommand)]
 pub enum Commands {
     Default(default::Command),
+    Doctor(doctor::Command),
     Install(install::Command),
     Remove(remove::Command),
     List(list::Command),
@@ -48,6 +50,7 @@ pub enum Commands {
     Switch(switch::Command),
     Update(update::Command),
     Which(which::Command),
+    Cleanup(cleanup::Command),
 }
 
 impl Command {
@@ -59,6 +62,7 @@ impl Command {
 
         match &self.command {
             Commands::Default(cmd) => cmd.exec(),
+            Commands::Doctor(cmd) => cmd.exec(&self.github_token).await,
             Commands::Install(cmd) => cmd.exec(&self.github_token).await,
             Commands::Remove(cmd) => cmd.exec(&self.github_token).await,
             Commands::List(cmd) => cmd.exec(&self.github_token).await,
@@ -67,12 +71,15 @@ impl Command {
             Commands::Switch(cmd) => cmd.exec(),
             Commands::Update(cmd) => cmd.exec(&self.github_token).await,
             Commands::Which(cmd) => cmd.exec(),
+            Commands::Cleanup(cmd) => cmd.exec(&self.github_token).await,
         }
     }
 }
 
 #[derive(Subcommand)]
 pub enum ComponentCommands {
+    #[command(about = "Run diagnostic checks on the environment")]
+    Doctor,
     #[command(about = "List available binaries to install")]
     List,
     #[command(about = "Add a binary")]
@@ -105,6 +112,19 @@ pub enum ComponentCommands {
     Remove {
         #[arg(value_enum)]
         binary: BinaryName,
+    },
+    #[command(about = "Cleanup cache files")]
+    Cleanup {
+        /// Remove all cache files
+        /// If not specified, only cache files older than `days` will be removed
+        #[arg(long, conflicts_with = "days")]
+        all: bool,
+        /// Days to keep files in cache (default: 30)
+        #[arg(long, short = 'd', default_value = "30")]
+        days: u32,
+        /// Show what would be removed without actually removing anything
+        #[arg(long, short = 'n')]
+        dry_run: bool,
     },
 }
 
