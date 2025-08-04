@@ -9,7 +9,7 @@ use super::version::extract_version_from_release;
 use crate::commands::BinaryName;
 use crate::handlers::download::{download_latest_release, download_release_at_version};
 use crate::handlers::{extract_component, update_after_install};
-use crate::mvr;
+use crate::standalone;
 use crate::paths::binaries_dir;
 use crate::types::{BinaryVersion, InstalledBinaries, Repo};
 use anyhow::anyhow;
@@ -163,19 +163,14 @@ pub async fn install_from_nightly(
     Ok(())
 }
 
-/// Install MVR CLI
-pub async fn install_mvr(version: Option<String>, yes: bool) -> Result<(), Error> {
+pub async fn install_standalone(version: Option<String>, repo: Repo, yes: bool) -> Result<(), Error> {
     let network = "standalone".to_string();
-    let binary_name = BinaryName::Mvr.to_string();
-    if !check_if_binaries_exist(
-        &binary_name,
-        network.clone(),
-        &version.clone().unwrap_or_default(),
-    )? {
-        let mut installer = mvr::MvrInstaller::new();
+    let binary_name = repo.binary_name();
+    if !check_if_binaries_exist(&binary_name, network.clone(), &version.clone().unwrap_or_default())? {
+        let mut installer = standalone::StandaloneInstaller::new(repo);
         let installed_version = installer.download_version(version).await?;
 
-        println!("Adding binary: mvr-{installed_version}");
+        println!("Adding binary: {binary_name}-{installed_version}");
 
         let binary_path = binaries_dir()
             .join(&network)
@@ -190,7 +185,7 @@ pub async fn install_mvr(version: Option<String>, yes: bool) -> Result<(), Error
         )?;
     } else {
         let version = version.unwrap_or_default();
-        println!("Binary mvr-{version} already installed. Use `suiup default set mvr {version}` to set the default version to the specified one.");
+        println!("Binary {binary_name}-{version} already installed. Use `suiup default set {binary_name} {version}` to set the default version to the specified one.");
     }
 
     Ok(())

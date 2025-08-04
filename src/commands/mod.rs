@@ -139,6 +139,8 @@ pub enum BinaryName {
     Walrus,
     #[value(name = "site-builder")]
     WalrusSites,
+    #[value(name = "sui-ledger-signer")]
+    LedgerSigner,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -164,6 +166,7 @@ impl BinaryName {
             BinaryName::Sui => "sui",
             BinaryName::Walrus => "walrus",
             BinaryName::WalrusSites => "site-builder",
+            BinaryName::LedgerSigner => "sui-ledger-signer",
         }
     }
 }
@@ -175,6 +178,7 @@ impl std::fmt::Display for BinaryName {
             BinaryName::Sui => write!(f, "sui"),
             BinaryName::Walrus => write!(f, "walrus"),
             BinaryName::WalrusSites => write!(f, "site-builder"),
+            BinaryName::LedgerSigner => write!(f, "sui-ledger-signer"),
         }
     }
 }

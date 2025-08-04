@@ -32,16 +32,16 @@ fn generate_network_suggestions_error(
     let binary_name = repo.binary_name();
 
     // MVR is a standalone binary, not tied to networks like sui and walrus
-    if matches!(repo, Repo::Mvr) {
+    if matches!(repo, Repo::Mvr) || matches!(repo, Repo::LedgerSigner) {
         if let Some(version) = version {
             return anyhow!(
-                "MVR version {} not found. MVR is a standalone binary - try: suiup install mvr {}",
-                version,
-                version
+                "{binary_name} version {version} not found. {binary_name} is a standalone binary \
+                - try: suiup install {binary_name} {version}",
             );
         } else {
             return anyhow!(
-                "MVR release not found. MVR is a standalone binary - try: suiup install mvr"
+                "{binary_name} release not found. {binary_name} is a standalone binary \
+                - try: suiup install {binary_name}"
             );
         }
     }
@@ -411,8 +411,8 @@ mod tests {
             generate_network_suggestions_error(&Repo::Mvr, &releases, Some("1.0.0"), "standalone");
         let error_msg = error.to_string();
 
-        assert!(error_msg.contains("MVR version 1.0.0 not found"));
-        assert!(error_msg.contains("MVR is a standalone binary"));
+        assert!(error_msg.contains("mvr version 1.0.0 not found"));
+        assert!(error_msg.contains("mvr is a standalone binary"));
         assert!(error_msg.contains("suiup install mvr 1.0.0"));
     }
 
@@ -422,8 +422,8 @@ mod tests {
         let error = generate_network_suggestions_error(&Repo::Mvr, &releases, None, "standalone");
         let error_msg = error.to_string();
 
-        assert!(error_msg.contains("MVR release not found"));
-        assert!(error_msg.contains("MVR is a standalone binary"));
+        assert!(error_msg.contains("mvr release not found"));
+        assert!(error_msg.contains("mvr is a standalone binary"));
         assert!(error_msg.contains("suiup install mvr"));
     }
 }

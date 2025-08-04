@@ -5,7 +5,7 @@ use anyhow::{anyhow, Result};
 use std::fs::create_dir_all;
 
 use crate::commands::BinaryName;
-use crate::handlers::install::{install_from_nightly, install_from_release, install_mvr};
+use crate::handlers::install::{install_from_nightly, install_from_release, install_standalone};
 use crate::paths::{binaries_dir, get_default_bin_dir};
 use crate::types::{Repo, Version};
 
@@ -72,12 +72,16 @@ pub async fn install_component(
             }
         }
 
-        (BinaryName::Mvr, nightly) => {
+        (BinaryName::Mvr, nightly) | (BinaryName::LedgerSigner, nightly) => {
             create_dir_all(installed_bins_dir.join("standalone"))?;
             if let Some(branch) = nightly {
                 install_from_nightly(&name, branch, debug, yes).await?;
             } else {
-                install_mvr(version, yes).await?;
+                install_standalone(version, match name {
+                    BinaryName::Mvr => Repo::Mvr,
+                    BinaryName::LedgerSigner => Repo::LedgerSigner,
+                    _ => return Err(anyhow!("Invalid binary name for standalone installation")),
+                }, yes).await?;
             }
         }
         (_, Some(branch)) => {
