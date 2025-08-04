@@ -283,6 +283,9 @@ mod tests {
         cmd.assert().success();
         assert!(installed_binaries_file().unwrap().exists());
 
+        #[cfg(windows)]
+        let default_mvr_binary = test_env.bin_dir.join("mvr.exe");
+        #[cfg(not(windows))]
         let default_mvr_binary = test_env.bin_dir.join("mvr");
         let version_cmd = Command::new(&default_mvr_binary)
             .arg("--version")
