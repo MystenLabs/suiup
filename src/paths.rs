@@ -115,7 +115,8 @@ pub fn get_default_bin_dir() -> PathBuf {
         env::var_os("SUIUP_DEFAULT_BIN_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|| {
-                let mut path = PathBuf::from(env::var_os("LOCALAPPDATA").expect("LOCALAPPDATA not set"));
+                let mut path =
+                    PathBuf::from(env::var_os("LOCALAPPDATA").expect("LOCALAPPDATA not set"));
                 path.push("bin");
                 if !path.exists() {
                     std::fs::create_dir_all(&path).unwrap();

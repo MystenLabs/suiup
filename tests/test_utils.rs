@@ -99,7 +99,7 @@ impl TestEnv {
         env::set_var("XDG_CONFIG_HOME", &config_dir);
         #[cfg(not(windows))]
         env::set_var("XDG_CACHE_HOME", &cache_dir);
-        
+
         // Set bin directory for all platforms
         env::set_var("SUIUP_DEFAULT_BIN_DIR", &bin_dir);
 
