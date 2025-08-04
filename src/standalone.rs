@@ -11,43 +11,39 @@ use anyhow::{anyhow, Error};
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
-pub struct MvrRelease {
+pub struct StandaloneRelease {
     pub tag_name: String,
-    pub assets: Vec<MvrAsset>,
+    pub assets: Vec<StandaloneAsset>,
 }
 
 #[derive(Deserialize, Debug)]
-pub struct MvrAsset {
+pub struct StandaloneAsset {
     pub name: String,
     pub browser_download_url: String,
 }
 
-pub struct MvrInstaller {
-    releases: Vec<MvrRelease>,
+pub struct StandaloneInstaller {
+    releases: Vec<StandaloneRelease>,
+    repo: Repo,
 }
 
-impl Default for MvrInstaller {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl MvrInstaller {
-    pub fn new() -> Self {
+impl StandaloneInstaller {
+    pub fn new(repo: Repo) -> Self {
         Self {
             releases: Vec::new(),
+            repo,
         }
     }
 
     pub async fn get_releases(&mut self) -> Result<(), Error> {
         let client = reqwest::Client::new();
-        let url = format!("https://api.github.com/repos/{}/releases", Repo::Mvr);
+        let url = format!("https://api.github.com/repos/{}/releases", self.repo);
 
         if !self.releases.is_empty() {
             return Ok(());
         }
 
-        let releases: Vec<MvrRelease> = client
+        let releases: Vec<StandaloneRelease> = client
             .get(&url)
             .header("User-Agent", "suiup")
             .send()
@@ -58,15 +54,15 @@ impl MvrInstaller {
         Ok(())
     }
 
-    pub fn get_latest_release(&self) -> Result<&MvrRelease, Error> {
+    pub fn get_latest_release(&self) -> Result<&StandaloneRelease, Error> {
         println!("Downloading release list");
         let releases = &self.releases;
         releases
             .first()
-            .ok_or_else(|| anyhow!("No MVR releases found"))
+            .ok_or_else(|| anyhow!("No {} releases found", self.repo.binary_name()))
     }
 
-    /// Download the MVR CLI binary, if it does not exist in the binary folder.
+    /// Download the CLI binary, if it does not exist in the binary folder.
     pub async fn download_version(&mut self, version: Option<String>) -> Result<String, Error> {
         let version = if let Some(v) = version {
             // Ensure version has 'v' prefix for GitHub release tags
@@ -85,12 +81,14 @@ impl MvrInstaller {
             std::fs::create_dir_all(&cache_folder)?;
         }
         #[cfg(not(windows))]
-        let mvr_binary_path = cache_folder.join(format!("mvr-{}", version));
+        let standalone_binary_path =
+            cache_folder.join(format!("{}-{}", self.repo.binary_name(), version));
         #[cfg(target_os = "windows")]
-        let mvr_binary_path = cache_folder.join(format!("mvr-{}.exe", version));
+        let standalone_binary_path =
+            cache_folder.join(format!("{}-{}.exe", self.repo.binary_name(), version));
 
-        if mvr_binary_path.exists() {
-            println!("Binary mvr-{version} already installed. Use `suiup default set mvr {version}` to set the default version to the desired one");
+        if standalone_binary_path.exists() {
+            println!("Binary {}-{version} already installed. Use `suiup default set standalone {version}` to set the default version to the desired one", self.repo.binary_name());
             return Ok(version);
         }
 
@@ -105,7 +103,7 @@ impl MvrInstaller {
             .ok_or_else(|| anyhow!("Version {} not found", version))?;
 
         let (os, arch) = detect_os_arch()?;
-        let asset_name = format!("mvr-{}-{}", os, arch);
+        let asset_name = format!("{}-{}-{}", self.repo.binary_name(), os, arch);
 
         #[cfg(target_os = "windows")]
         let asset_name = format!("{}.exe", asset_name);
@@ -114,12 +112,18 @@ impl MvrInstaller {
             .assets
             .iter()
             .find(|a| a.name.starts_with(&asset_name))
-            .ok_or_else(|| anyhow!("No compatible binary found for your system"))?;
+            .ok_or_else(|| {
+                anyhow!(
+                    "No compatible binary found for your system: {}-{}",
+                    os,
+                    arch
+                )
+            })?;
 
         download_file(
             &asset.browser_download_url,
-            &mvr_binary_path,
-            format!("mvr-{}", version).as_str(),
+            &standalone_binary_path,
+            format!("{}-{version}", self.repo.binary_name()).as_str(),
             None,
         )
         .await?;
@@ -127,9 +131,9 @@ impl MvrInstaller {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let mut perms = std::fs::metadata(&mvr_binary_path)?.permissions();
+            let mut perms = std::fs::metadata(&standalone_binary_path)?.permissions();
             perms.set_mode(0o755);
-            std::fs::set_permissions(&mvr_binary_path, perms)?;
+            std::fs::set_permissions(&standalone_binary_path, perms)?;
         }
 
         Ok(version)
