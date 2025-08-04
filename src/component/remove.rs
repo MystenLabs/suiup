@@ -9,18 +9,17 @@ use std::path::PathBuf;
 use anyhow::{anyhow, Result};
 use tracing::debug;
 
-use crate::commands::BinaryName;
 use crate::paths::{default_file_path, get_default_bin_dir};
 use crate::types::InstalledBinaries;
 
 /// Remove a component and its associated files
-pub async fn remove_component(binary: BinaryName) -> Result<()> {
+pub async fn remove_component(binary: String) -> Result<()> {
     let mut installed_binaries = InstalledBinaries::new()?;
 
     let binaries_to_remove = installed_binaries
         .binaries()
         .iter()
-        .filter(|b| binary.to_string() == b.binary_name)
+        .filter(|b| binary == b.binary_name)
         .collect::<Vec<_>>();
 
     if binaries_to_remove.is_empty() {

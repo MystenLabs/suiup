@@ -9,7 +9,7 @@ mod remove;
 use anyhow::Result;
 
 use crate::commands::{
-    parse_component_with_version, BinaryName, CommandMetadata, ComponentCommands,
+    parse_component_with_version, CommandMetadata, ComponentCommands,
 };
 
 /// ComponentManager handles all component-related operations
@@ -74,7 +74,7 @@ impl ComponentManager {
     }
 
     /// Remove a component
-    async fn remove_component(&self, binary: BinaryName) -> Result<()> {
+    async fn remove_component(&self, binary: String) -> Result<()> {
         remove::remove_component(binary).await
     }
 

@@ -6,7 +6,6 @@ use std::process::{Command, Stdio};
 
 use super::check_if_binaries_exist;
 use super::version::extract_version_from_release;
-use crate::commands::BinaryName;
 use crate::handlers::download::{download_latest_release, download_release_at_version};
 use crate::handlers::{extract_component, update_after_install};
 use crate::mvr;
@@ -57,7 +56,10 @@ pub async fn install_from_release(
     };
 
     let version = extract_version_from_release(&filename)?;
-    let binary_name = if debug && name == "sui" {
+    use crate::config::get_binary_config;
+    let bin_config = get_binary_config(name)?;
+    
+    let binary_name = if debug && bin_config.supports_debug {
         format!("{}-debug", name)
     } else {
         name.to_string()
@@ -82,7 +84,7 @@ pub async fn install_from_release(
 /// Compile the code from the main branch or the specified branch.
 /// It checks if cargo is installed.
 pub async fn install_from_nightly(
-    name: &BinaryName,
+    name: &str,
     branch: &str,
     debug: bool,
     yes: bool,
@@ -99,20 +101,25 @@ pub async fn install_from_nightly(
     pb.enable_steady_tick(Duration::from_millis(100));
     pb.set_message("Compiling...please wait");
 
-    let repo_url = name.repo_url();
+    use crate::config::{get_config, get_binary_config};
+    let config = get_config()?;
+    let bin_config = get_binary_config(name)?;
+    let repo_url = config.get_repo_url(name)
+        .ok_or_else(|| anyhow!("Repository URL not found for {}", name))?;
     let binaries_folder = binaries_dir();
     let binaries_folder_branch = binaries_folder.join(branch);
 
     let mut args = vec![
-        "install", "--locked", "--force", "--git", repo_url, "--branch", branch,
+        "install", "--locked", "--force", "--git", &repo_url, "--branch", branch,
     ];
 
-    if name == &BinaryName::Walrus {
+    // Special handling for walrus which needs to install from walrus-service package
+    if name == "walrus" {
         args.push("walrus-service");
         args.push("--bin");
         args.push("walrus");
     } else {
-        args.push(name.to_str());
+        args.push(&bin_config.binary_name);
     };
 
     args.extend(vec!["--root", binaries_folder_branch.to_str().unwrap()]);
@@ -134,7 +141,7 @@ pub async fn install_from_nightly(
 
     println!("Installation completed successfully!");
     // bin folder is needed because cargo installs in  /folder/bin/binary_name.
-    let orig_binary_path = binaries_folder_branch.join("bin").join(name.to_str());
+    let orig_binary_path = binaries_folder_branch.join("bin").join(name);
 
     // rename the binary to `binary_name-nightly`, to keep things in sync across the board
 
@@ -152,7 +159,7 @@ pub async fn install_from_nightly(
 
     std::fs::rename(&orig_binary_path, &dst)?;
     install_binary(
-        name.to_str(),
+        name,
         branch.to_string(),
         "nightly",
         debug,
@@ -165,8 +172,10 @@ pub async fn install_from_nightly(
 
 /// Install MVR CLI
 pub async fn install_mvr(version: Option<String>, yes: bool) -> Result<(), Error> {
-    let network = "standalone".to_string();
-    let binary_name = BinaryName::Mvr.to_string();
+    use crate::config::get_binary_config;
+    let bin_config = get_binary_config("mvr")?;
+    let network = bin_config.default_network.clone();
+    let binary_name = bin_config.binary_name.clone();
     if !check_if_binaries_exist(
         &binary_name,
         network.clone(),

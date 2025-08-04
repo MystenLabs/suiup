@@ -33,8 +33,11 @@ pub mod cleanup;
 
 pub const RELEASES_ARCHIVES_FOLDER: &str = "releases";
 
-pub fn available_components() -> &'static [&'static str] {
-    &["sui", "mvr", "walrus", "site-builder"]
+pub fn available_components() -> Vec<String> {
+    use crate::config::get_config;
+    get_config()
+        .map(|c| c.binaries.iter().map(|b| b.name.clone()).collect())
+        .unwrap_or_else(|_| vec!["sui".to_string(), "mvr".to_string(), "walrus".to_string(), "site-builder".to_string()])
 }
 
 // Main component handling function
@@ -82,7 +85,10 @@ pub fn update_after_install(
 ) -> Result<(), Error> {
     // First check if the binary exists
     for binary in name {
-        let binary_name = if *binary == "sui" && debug {
+        use crate::config::get_binary_config;
+        let bin_config = get_binary_config(binary)?;
+        
+        let binary_name = if bin_config.supports_debug && debug {
             format!("{}-debug", binary)
         } else {
             binary.clone()

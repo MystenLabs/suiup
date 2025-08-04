@@ -41,7 +41,8 @@ impl MvrInstaller {
 
     pub async fn get_releases(&mut self) -> Result<(), Error> {
         let client = reqwest::Client::new();
-        let url = format!("https://api.github.com/repos/{}/releases", Repo::Mvr);
+        let repo = Repo::mvr()?;
+        let url = format!("https://api.github.com/repos/{}/releases", repo);
 
         if !self.releases.is_empty() {
             return Ok(());

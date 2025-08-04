@@ -278,6 +278,27 @@ install_suiup() {
     # Move binary to install directory
     mv "$tmp_dir/suiup" "$installed_path"
     
+    # Install configuration file to config directory
+    config_dir=""
+    if [ "$os" = "macos" ] || [ "$os" = "linux" ]; then
+        config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/suiup"
+    elif [ "$os" = "windows" ]; then
+        config_dir="$HOME/.config/suiup"
+    fi
+    
+    if [ -n "$config_dir" ]; then
+        printf 'Installing configuration file to %s...\n' "$config_dir"
+        mkdir -p "$config_dir"
+        
+        # Check if binaries.json exists in the extracted archive
+        if [ -f "$tmp_dir/binaries.json" ]; then
+            cp "$tmp_dir/binaries.json" "$config_dir/binaries.json"
+            printf '%bConfiguration file installed successfully%b\n' "${GREEN}" "${NC}"
+        else
+            printf '%bWarning: binaries.json not found in archive, configuration may need manual setup%b\n' "${YELLOW}" "${NC}"
+        fi
+    fi
+    
     printf '%bSuccessfully installed suiup to %s%b\n' "${GREEN}" "$installed_path" "${NC}"
     
     # Check PATH

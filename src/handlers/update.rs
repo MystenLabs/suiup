@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    commands::{parse_component_with_version, BinaryName, CommandMetadata, ComponentCommands},
+    commands::{parse_component_with_version, CommandMetadata, ComponentCommands},
     handle_commands::handle_cmd,
     types::InstalledBinaries,
 };
@@ -31,13 +31,13 @@ pub async fn handle_update(
         bail!("Update should be done without a version. Use `suiup install` to specify a version");
     }
 
-    if !available_components().contains(&name.to_str()) {
+    if !available_components().contains(&name.to_string()) {
         bail!("Invalid component name: {}", name);
     }
 
     let installed_binaries = InstalledBinaries::new()?;
     let binaries = installed_binaries.binaries();
-    if !binaries.iter().any(|x| x.binary_name == name.to_str()) {
+    if !binaries.iter().any(|x| x.binary_name == name) {
         bail!("Binary {name} not found in installed binaries. Use `suiup show` to see installed binaries and `suiup install` to install the binary.")
     }
     let binaries_by_network = installed_binaries_grouped_by_network(Some(installed_binaries))?;
@@ -47,7 +47,7 @@ pub async fn handle_update(
     for (network, binaries) in &binaries_by_network {
         let last_version = binaries
             .iter()
-            .filter(|x| x.binary_name == name.to_str())
+            .filter(|x| x.binary_name == name)
             .collect::<Vec<_>>();
         if last_version.is_empty() {
             continue;
@@ -67,7 +67,10 @@ pub async fn handle_update(
     // find the last local version of the name binary, for each network
     // then find the last release for each network and compare the versions
 
-    if name == BinaryName::Mvr {
+    use crate::config::get_binary_config;
+    let bin_config = get_binary_config(&name)?;
+    
+    if bin_config.supported_networks.is_empty() {
         handle_cmd(
             ComponentCommands::Add {
                 component: binary_name,
@@ -81,7 +84,7 @@ pub async fn handle_update(
         return Ok(());
     }
 
-    if name == BinaryName::Walrus {
+    if name == "walrus" {
         handle_cmd(
             ComponentCommands::Add {
                 component: binary_name,
@@ -95,7 +98,8 @@ pub async fn handle_update(
         return Ok(());
     }
 
-    let releases = release_list(&Repo::Sui, github_token.clone()).await?.0;
+    let repo = Repo::from_binary_name(&name)?;
+    let releases = release_list(&repo, github_token.clone()).await?.0;
     let mut to_update = vec![];
     for (n, v) in &network_local_last_version {
         let last_release = last_release_for_network(&releases, n).await?;

@@ -6,7 +6,8 @@ use clap::Args;
 use tracing::{debug, info};
 
 use crate::{
-    commands::{parse_component_with_version, BinaryName, CommandMetadata},
+    commands::{parse_component_with_version, CommandMetadata},
+    config::get_binary_config,
     handlers::{installed_binaries_grouped_by_network, update_default_version_file},
     paths::{binaries_dir, get_default_bin_dir},
 };
@@ -51,11 +52,12 @@ impl Command {
             version,
         } = parse_component_with_version(name)?;
 
-        let network = if name == BinaryName::Mvr {
+        let bin_config = get_binary_config(&name)?;
+        let network = if bin_config.supported_networks.is_empty() {
             if let Some(ref nightly) = nightly {
                 nightly
             } else {
-                "standalone"
+                &bin_config.default_network
             }
         } else if let Some(ref nightly) = nightly {
             nightly
@@ -98,7 +100,7 @@ impl Command {
         binaries
         .iter()
         .find(|b| {
-            b.binary_name == name.to_string() && b.version == version && b.network_release == network
+            b.binary_name == name && b.version == version && b.network_release == *network
         })
         .ok_or_else(|| {
             anyhow!("Binary {binary_version} from {network} release not found. Use `suiup show` to see installed binaries.")

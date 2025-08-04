@@ -1,0 +1,40 @@
+{
+  "binaries": [
+    {
+      "name": "sui",
+      "binary_name": "sui",
+      "repository": "MystenLabs/sui",
+      "description": "Sui blockchain CLI tool",
+      "supported_networks": ["testnet", "devnet", "mainnet"],
+      "default_network": "testnet",
+      "supports_debug": true
+    },
+    {
+      "name": "mvr",
+      "binary_name": "mvr",
+      "repository": "MystenLabs/mvr",
+      "description": "Move Registry CLI for managing Move packages",
+      "supported_networks": [],
+      "default_network": "standalone",
+      "supports_debug": false
+    },
+    {
+      "name": "walrus",
+      "binary_name": "walrus",
+      "repository": "MystenLabs/walrus",
+      "description": "Walrus decentralized storage CLI",
+      "supported_networks": ["testnet", "devnet", "mainnet"],
+      "default_network": "testnet",
+      "supports_debug": false
+    },
+    {
+      "name": "site-builder",
+      "binary_name": "site-builder",
+      "repository": "MystenLabs/walrus-sites",
+      "description": "Walrus Sites builder for decentralized websites",
+      "supported_networks": ["testnet", "devnet", "mainnet"],
+      "default_network": "testnet",
+      "supports_debug": false
+    }
+  ]
+}

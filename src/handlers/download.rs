@@ -31,18 +31,29 @@ fn generate_network_suggestions_error(
 ) -> anyhow::Error {
     let binary_name = repo.binary_name();
 
-    // MVR is a standalone binary, not tied to networks like sui and walrus
-    if matches!(repo, Repo::Mvr) {
-        if let Some(version) = version {
-            return anyhow!(
-                "MVR version {} not found. MVR is a standalone binary - try: suiup install mvr {}",
-                version,
-                version
-            );
-        } else {
-            return anyhow!(
-                "MVR release not found. MVR is a standalone binary - try: suiup install mvr"
-            );
+    use crate::config::get_binary_config;
+    let bin_config = get_binary_config(binary_name).ok();
+    
+    // Check if this binary doesn't use networks (like MVR)
+    if let Some(config) = &bin_config {
+        if config.supported_networks.is_empty() {
+            if let Some(version) = version {
+                return anyhow!(
+                    "{} version {} not found. {} is a standalone binary - try: suiup install {} {}",
+                    config.name,
+                    version,
+                    config.name,
+                    config.name,
+                    version
+                );
+            } else {
+                return anyhow!(
+                    "{} release not found. {} is a standalone binary - try: suiup install {}",
+                    config.name,
+                    config.name,
+                    config.name
+                );
+            }
         }
     }
 
@@ -68,15 +79,19 @@ fn generate_network_suggestions_error(
         }
     } else {
         // For latest release requests, check what networks are available
-        let available_networks: Vec<String> = ["testnet", "devnet", "mainnet"]
-            .iter()
-            .filter(|&net| {
-                releases
-                    .iter()
-                    .any(|r| r.assets.iter().any(|a| a.name.contains(net)))
-            })
-            .map(|s| s.to_string())
-            .collect();
+        let available_networks: Vec<String> = if let Some(config) = &bin_config {
+            config.supported_networks.clone()
+        } else {
+            vec!["testnet".to_string(), "devnet".to_string(), "mainnet".to_string()]
+        }
+        .iter()
+        .filter(|&net| {
+            releases
+                .iter()
+                .any(|r| r.assets.iter().any(|a| a.name.contains(net)))
+        })
+        .map(|s| s.to_string())
+        .collect();
 
         if !available_networks.is_empty() {
             let suggestions: Vec<String> = available_networks

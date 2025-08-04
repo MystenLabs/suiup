@@ -3,6 +3,7 @@
 
 pub mod commands;
 pub mod component;
+pub mod config;
 pub mod handle_commands;
 pub mod handlers;
 pub mod mvr;

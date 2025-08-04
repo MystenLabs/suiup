@@ -17,34 +17,54 @@ use crate::paths::{default_file_path, installed_binaries_file};
 
 pub type Version = String;
 
-#[derive(Debug)]
-pub enum Repo {
-    Sui,
-    Mvr,
-    Walrus,
-    WalrusSites,
+#[derive(Debug, Clone)]
+pub struct Repo {
+    pub name: String,
+    pub binary_name: String,
+    pub repository: String,
 }
 
 impl Repo {
+    /// Creates a Repo from a binary name using the configuration
+    pub fn from_binary_name(name: &str) -> Result<Self, Error> {
+        use crate::config::get_binary_config;
+        let config = get_binary_config(name)?;
+        Ok(Repo {
+            name: config.name.clone(),
+            binary_name: config.binary_name.clone(),
+            repository: config.repository.clone(),
+        })
+    }
+
     /// Returns the binary name for this repository
-    pub fn binary_name(&self) -> &'static str {
-        match self {
-            Repo::Mvr => "mvr",
-            Repo::Sui => "sui",
-            Repo::Walrus => "walrus",
-            Repo::WalrusSites => "site-builder",
-        }
+    pub fn binary_name(&self) -> &str {
+        &self.binary_name
+    }
+
+    /// Creates a Repo for Sui (backward compatibility)
+    pub fn sui() -> Result<Self, Error> {
+        Self::from_binary_name("sui")
+    }
+
+    /// Creates a Repo for MVR (backward compatibility)
+    pub fn mvr() -> Result<Self, Error> {
+        Self::from_binary_name("mvr")
+    }
+
+    /// Creates a Repo for Walrus (backward compatibility)
+    pub fn walrus() -> Result<Self, Error> {
+        Self::from_binary_name("walrus")
+    }
+
+    /// Creates a Repo for WalrusSites (backward compatibility)
+    pub fn walrus_sites() -> Result<Self, Error> {
+        Self::from_binary_name("site-builder")
     }
 }
 
 impl Display for Repo {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Mvr => write!(f, "MystenLabs/mvr"),
-            Self::Sui => write!(f, "MystenLabs/sui"),
-            Self::Walrus => write!(f, "MystenLabs/walrus"),
-            Self::WalrusSites => write!(f, "MystenLabs/walrus-sites"),
-        }
+        write!(f, "{}", self.repository)
     }
 }
 

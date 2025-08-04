@@ -15,8 +15,8 @@ mod cleanup;
 
 use crate::{handlers::self_::check_for_updates, types::BinaryVersion};
 
-use anyhow::{anyhow, bail, Result};
-use clap::{Parser, Subcommand, ValueEnum};
+use anyhow::{bail, Result};
+use clap::{Parser, Subcommand};
 use comfy_table::Table;
 pub const TABLE_FORMAT: &str = "  ── ══      ──    ";
 #[derive(Parser)]
@@ -110,8 +110,7 @@ pub enum ComponentCommands {
         about = "Remove one. By default, the binary from each release will be removed. Use --version to specify which exact version to remove"
     )]
     Remove {
-        #[arg(value_enum)]
-        binary: BinaryName,
+        binary: String,
     },
     #[command(about = "Cleanup cache files")]
     Cleanup {
@@ -128,68 +127,24 @@ pub enum ComponentCommands {
     },
 }
 
-#[derive(Clone, Debug, PartialEq, Hash, Eq, ValueEnum)]
-#[value(rename_all = "lowercase")]
-pub enum BinaryName {
-    #[value(name = "mvr")]
-    Mvr,
-    #[value(name = "sui")]
-    Sui,
-    #[value(name = "walrus")]
-    Walrus,
-    #[value(name = "site-builder")]
-    WalrusSites,
-}
-
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct CommandMetadata {
-    pub name: BinaryName,
+    pub name: String,
     pub network: String,
     pub version: Option<String>,
 }
 
-impl BinaryName {
-    pub fn repo_url(&self) -> &str {
-        match self {
-            BinaryName::Mvr => "https://github.com/MystenLabs/mvr",
-            BinaryName::Walrus => "https://github.com/MystenLabs/walrus",
-            BinaryName::WalrusSites => "https://github.com/MystenLabs/walrus-sites",
-            _ => "https://github.com/MystenLabs/sui",
-        }
-    }
-
-    pub fn to_str(&self) -> &str {
-        match self {
-            BinaryName::Mvr => "mvr",
-            BinaryName::Sui => "sui",
-            BinaryName::Walrus => "walrus",
-            BinaryName::WalrusSites => "site-builder",
-        }
-    }
-}
-
-impl std::fmt::Display for BinaryName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BinaryName::Mvr => write!(f, "mvr"),
-            BinaryName::Sui => write!(f, "sui"),
-            BinaryName::Walrus => write!(f, "walrus"),
-            BinaryName::WalrusSites => write!(f, "site-builder"),
-        }
-    }
-}
-
-impl std::str::FromStr for BinaryName {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "sui" => Ok(BinaryName::Sui),
-            "mvr" => Ok(BinaryName::Mvr),
-            "walrus" => Ok(BinaryName::Walrus),
-            "site-builder" => Ok(BinaryName::WalrusSites),
-            _ => Err(format!("Unknown binary: {}", s)),
-        }
+pub fn validate_binary_name(name: &str) -> Result<String, anyhow::Error> {
+    use crate::config::get_config;
+    let config = get_config()?;
+    
+    // Check if the binary exists in the configuration
+    if config.get_binary(name).is_some() {
+        Ok(name.to_string())
+    } else {
+        bail!("Unknown binary: {}. Available binaries: {}", 
+              name, 
+              config.available_components().join(", "))
     }
 }
 
@@ -209,9 +164,8 @@ pub fn parse_component_with_version(s: &str) -> Result<CommandMetadata, anyhow::
 
     match parts.len() {
         1 => {
-            let component = BinaryName::from_str(parts[0], true)
-                .map_err(|_| anyhow!("Invalid binary name: {}. Use `suiup list` to find available binaries to install.", parts[0]))?;
-            let (network, version) = parse_version_spec(None)?;
+            let component = validate_binary_name(parts[0])?;
+            let (network, version) = parse_version_spec(None, &component)?;
             let component_metadata = CommandMetadata {
                 name: component,
                 network,
@@ -220,9 +174,8 @@ pub fn parse_component_with_version(s: &str) -> Result<CommandMetadata, anyhow::
             Ok(component_metadata)
         }
         2 => {
-            let component = BinaryName::from_str(parts[0], true)
-                .map_err(|_| anyhow!("Invalid binary name: {}. Use `suiup list` to find available binaries to install.", parts[0]))?;
-            let (network, version) = parse_version_spec(Some(parts[1].to_string()))?;
+            let component = validate_binary_name(parts[0])?;
+            let (network, version) = parse_version_spec(Some(parts[1].to_string()), &component)?;
             let component_metadata = CommandMetadata {
                 name: component,
                 network,
@@ -234,9 +187,16 @@ pub fn parse_component_with_version(s: &str) -> Result<CommandMetadata, anyhow::
     }
 }
 
-pub fn parse_version_spec(spec: Option<String>) -> Result<(String, Option<String>)> {
+pub fn parse_version_spec(spec: Option<String>, binary_name: &str) -> Result<(String, Option<String>)> {
+    use crate::config::get_config;
+    let config = get_config()?;
+    
+    // Get default network for the binary
+    let default_network = config.get_default_network(binary_name)
+        .unwrap_or_else(|| "testnet".to_string());
+    
     match spec {
-        None => Ok(("testnet".to_string(), None)),
+        None => Ok((default_network, None)),
         Some(spec) => {
             if spec.starts_with("testnet-")
                 || spec.starts_with("devnet-")
@@ -247,8 +207,8 @@ pub fn parse_version_spec(spec: Option<String>) -> Result<(String, Option<String
             } else if spec == "testnet" || spec == "devnet" || spec == "mainnet" {
                 Ok((spec, None))
             } else {
-                // Assume it's a version for testnet
-                Ok(("testnet".to_string(), Some(spec)))
+                // Assume it's a version for the default network
+                Ok((default_network, Some(spec)))
             }
         }
     }
