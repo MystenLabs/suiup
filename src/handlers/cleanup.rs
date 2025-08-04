@@ -53,16 +53,16 @@ pub async fn handle_cleanup(all: bool, days: u32, dry_run: bool) -> Result<()> {
         for entry in entries {
             let entry = entry?;
             let path = entry.path();
-            
+
             if !path.is_file() {
                 continue;
             }
-            
+
             // Get file metadata and age
             let metadata = fs::metadata(&path)?;
             let modified_time = metadata.modified()?;
             let age = SystemTime::now().duration_since(modified_time)?;
-            
+
             // Convert to days for display
             let days_old = age.as_secs() / (60 * 60 * 24);
 
@@ -117,12 +117,12 @@ fn calculate_dir_size(dir: &PathBuf) -> Result<u64> {
     if !dir.exists() {
         return Ok(0);
     }
-    
+
     let mut total_size = 0;
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
-        
+
         if path.is_file() {
             total_size += fs::metadata(&path)?.len();
         } else if path.is_dir() {
