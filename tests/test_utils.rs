@@ -74,6 +74,7 @@ impl TestEnv {
         // Store original env vars
         let vars_to_capture = vec![
             "LOCALAPPDATA",
+            "TEMP",
             "HOME",
             "XDG_DATA_HOME",
             "XDG_CONFIG_HOME",
@@ -89,6 +90,8 @@ impl TestEnv {
         // Set test env vars
         #[cfg(windows)]
         env::set_var("LOCALAPPDATA", &data_dir); // it is the same for data and config
+        #[cfg(windows)]
+        env::set_var("TEMP", &cache_dir);
         #[cfg(not(windows))]
         env::set_var("XDG_DATA_HOME", &data_dir);
         #[cfg(not(windows))]
