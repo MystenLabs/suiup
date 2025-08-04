@@ -307,7 +307,9 @@ mod tests {
         println!("Path exists: {}", path.exists());
         let result = check_suiup_data_dir();
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("suiup data directory not found"));
+        assert!(result
+            .unwrap_err()
+            .contains("suiup data directory not found"));
 
         // Restore original env var
         #[cfg(windows)]

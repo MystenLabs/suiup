@@ -1,6 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+mod cleanup;
 mod default;
 mod doctor;
 mod install;
@@ -11,7 +12,6 @@ mod show;
 mod switch;
 mod update;
 mod which;
-mod cleanup;
 
 use crate::{handlers::self_::check_for_updates, types::BinaryVersion};
 
