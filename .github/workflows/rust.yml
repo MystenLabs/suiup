@@ -51,12 +51,15 @@ jobs:
             git config --system core.longpaths true
           fi
 
-      - name: Run tests with test
-        shell: bash
-        run: RUST_LOG=debug cargo nextest run --no-fail-fast --retries 4
-
       - name: Check formatting
         uses: actions-rs/cargo@v1
         with:
           command: fmt
           args: --all -- --check
+
+      - name: Run tests with test
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUST_LOG: debug
+        run: cargo nextest run --no-fail-fast --retries 4
