@@ -74,6 +74,10 @@ pub async fn handle_update(
                 debug: false,
                 nightly: None,
                 yes,
+                path: None,
+                enable: false,
+                disable: false,
+                auto_detect: false,
             },
             github_token,
         )
@@ -88,6 +92,10 @@ pub async fn handle_update(
                 debug: false,
                 nightly: None,
                 yes,
+                path: None,
+                enable: false,
+                disable: false,
+                auto_detect: false,
             },
             github_token,
         )
@@ -116,6 +124,10 @@ pub async fn handle_update(
                 debug: false,
                 nightly: None,
                 yes,
+                path: None,
+                enable: false,
+                disable: false,
+                auto_detect: false,
             },
             github_token.clone(),
         )

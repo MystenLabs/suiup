@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod cleanup;
+mod config;
 mod default;
 mod doctor;
 mod install;
@@ -13,7 +14,7 @@ mod switch;
 mod update;
 mod which;
 
-use crate::{handlers::self_::check_for_updates, types::BinaryVersion};
+use crate::{handlers::self_::check_for_updates, handlers::config::ConfigHandler, types::BinaryVersion};
 
 use anyhow::{anyhow, bail, Result};
 use clap::{Parser, Subcommand, ValueEnum};
@@ -37,6 +38,11 @@ pub struct Command {
 
 #[derive(Subcommand)]
 pub enum Commands {
+    Cleanup(cleanup::Command),
+
+    #[command(about = "Manage suiup configuration settings")]
+    Config(config::Command),
+
     Default(default::Command),
     Doctor(doctor::Command),
     Install(install::Command),
@@ -50,28 +56,64 @@ pub enum Commands {
     Switch(switch::Command),
     Update(update::Command),
     Which(which::Command),
-    Cleanup(cleanup::Command),
 }
 
 impl Command {
     pub async fn exec(&self) -> Result<()> {
         // Check for updates before executing any command (except self update to avoid recursion)
-        if !matches!(self.command, Commands::Self_(_)) && !self.disable_update_warnings {
+        // Priority: command line flag > config file setting
+        let should_check_updates = if !matches!(self.command, Commands::Self_(_)) {
+            if self.disable_update_warnings {
+                false // Command line flag takes precedence
+            } else {
+                // Check config file setting
+                match ConfigHandler::new() {
+                    Ok(config_handler) => {
+                        let config = config_handler.get_config();
+                        // disable_update_warnings takes precedence over enable_update_warnings
+                        if config.disable_update_warnings {
+                            false
+                        } else {
+                            config.enable_update_warnings
+                        }
+                    }
+                    Err(_) => true, // Default to enabled if config can't be loaded
+                }
+            }
+        } else {
+            false // Never check for updates when running self commands
+        };
+
+        if should_check_updates {
             check_for_updates();
         }
 
+        // Resolve GitHub token: command line > config file > environment
+        let github_token = if self.github_token.is_some() {
+            self.github_token.clone()
+        } else {
+            match ConfigHandler::new() {
+                Ok(config_handler) => {
+                    let config = config_handler.get_config();
+                    config.github_token.clone()
+                }
+                Err(_) => None, // Fallback to None if config can't be loaded
+            }
+        };
+
         match &self.command {
+            Commands::Cleanup(cmd) => cmd.exec(&github_token).await,
+            Commands::Config(cmd) => cmd.exec().await,
             Commands::Default(cmd) => cmd.exec(),
-            Commands::Doctor(cmd) => cmd.exec(&self.github_token).await,
-            Commands::Install(cmd) => cmd.exec(&self.github_token).await,
-            Commands::Remove(cmd) => cmd.exec(&self.github_token).await,
-            Commands::List(cmd) => cmd.exec(&self.github_token).await,
+            Commands::Doctor(cmd) => cmd.exec(&github_token).await,
+            Commands::Install(cmd) => cmd.exec(&github_token).await,
+            Commands::Remove(cmd) => cmd.exec(&github_token).await,
+            Commands::List(cmd) => cmd.exec(&github_token).await,
             Commands::Self_(cmd) => cmd.exec().await,
             Commands::Show(cmd) => cmd.exec(),
             Commands::Switch(cmd) => cmd.exec(),
-            Commands::Update(cmd) => cmd.exec(&self.github_token).await,
+            Commands::Update(cmd) => cmd.exec(&github_token).await,
             Commands::Which(cmd) => cmd.exec(),
-            Commands::Cleanup(cmd) => cmd.exec(&self.github_token).await,
         }
     }
 }
@@ -105,6 +147,14 @@ pub enum ComponentCommands {
         nightly: Option<String>,
         #[arg(short, long, help = "Accept defaults without prompting")]
         yes: bool,
+        #[arg(long, value_name = "path", help = "Custom installation path for the binary")]
+        path: Option<String>,
+        #[arg(long, help = "Enable the tool after installation")]
+        enable: bool,
+        #[arg(long, conflicts_with = "enable", help = "Disable the tool after installation")]
+        disable: bool,
+        #[arg(long, help = "Auto-detect and use existing version if none specified")]
+        auto_detect: bool,
     },
     #[command(
         about = "Remove one. By default, the binary from each release will be removed. Use --version to specify which exact version to remove"
@@ -125,6 +175,12 @@ pub enum ComponentCommands {
         /// Show what would be removed without actually removing anything
         #[arg(long, short = 'n')]
         dry_run: bool,
+        /// Show cache statistics only
+        #[arg(long, short = 's')]
+        stats: bool,
+        /// Use smart cleanup strategy (removes oldest files first when size limit exceeded)
+        #[arg(long)]
+        smart: bool,
     },
 }
 

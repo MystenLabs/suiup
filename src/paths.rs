@@ -159,6 +159,11 @@ pub fn installed_binaries_file() -> Result<PathBuf, Error> {
     Ok(path)
 }
 
+/// Returns the path to the configuration file
+pub fn config_file_path() -> Result<PathBuf, Error> {
+    Ok(get_config_file("config.json"))
+}
+
 pub fn release_archive_dir() -> PathBuf {
     get_suiup_cache_dir().join(RELEASES_ARCHIVES_FOLDER)
 }

@@ -529,12 +529,13 @@ mod tests {
         let mut cmd = suiup_command(vec!["cleanup", "--help"], &test_env);
         cmd.assert()
             .success()
-            .stdout(predicate::str::contains("Usage: suiup cleanup"))
+            .stdout(predicate::str::contains("Usage: suiup"))
+            .stdout(predicate::str::contains("cleanup"))
             .stdout(predicate::str::contains("--all"))
             .stdout(predicate::str::contains("--days"))
             .stdout(predicate::str::contains("--dry-run"))
             .stdout(predicate::str::contains("Remove all cache files"))
-            .stdout(predicate::str::contains("Days to keep files in cache"));
+            .stdout(predicate::str::contains("Days to keep files in cache (overrides config setting)"));
 
         Ok(())
     }

@@ -8,6 +8,7 @@ use reqwest::header::ETAG;
 use reqwest::header::IF_NONE_MATCH;
 
 use crate::handlers::version::extract_version_from_release;
+use crate::handlers::config::ConfigHandler;
 use crate::paths::get_suiup_cache_dir;
 use crate::types::Release;
 use crate::types::Repo;
@@ -17,7 +18,24 @@ pub async fn release_list(
     repo: &Repo,
     github_token: Option<String>,
 ) -> Result<(Vec<Release>, Option<String>), anyhow::Error> {
-    let release_url = format!("https://api.github.com/repos/{}/releases", repo);
+    // Load configuration to get mirror URL
+    let config_handler = ConfigHandler::new()?;
+    let config = config_handler.get_config();
+    let base_url = if config.mirror_url.ends_with('/') {
+        config.mirror_url.trim_end_matches('/').to_string()
+    } else {
+        config.mirror_url.clone()
+    };
+    
+    // Convert github.com URL to API format
+    let api_url = if base_url.contains("github.com") {
+        base_url.replace("github.com", "api.github.com/repos")
+    } else {
+        // For other mirrors, assume they follow the same API structure
+        format!("{}/api/v1/repos", base_url)
+    };
+    
+    let release_url = format!("{}/{}/releases", api_url, repo);
     let client = reqwest::Client::new();
     let mut request = client.get(&release_url).header("User-Agent", "suiup");
 
