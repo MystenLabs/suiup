@@ -23,6 +23,7 @@ pub enum Repo {
     Mvr,
     Walrus,
     WalrusSites,
+    LedgerSigner,
 }
 
 impl Repo {
@@ -33,6 +34,7 @@ impl Repo {
             Repo::Sui => "sui",
             Repo::Walrus => "walrus",
             Repo::WalrusSites => "site-builder",
+            Repo::LedgerSigner => "sui-ledger-signer",
         }
     }
 }
@@ -44,6 +46,7 @@ impl Display for Repo {
             Self::Sui => write!(f, "MystenLabs/sui"),
             Self::Walrus => write!(f, "MystenLabs/walrus"),
             Self::WalrusSites => write!(f, "MystenLabs/walrus-sites"),
+            Self::LedgerSigner => write!(f, "MystenLabs/ledger-signer-rust"),
         }
     }
 }
