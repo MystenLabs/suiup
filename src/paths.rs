@@ -110,6 +110,15 @@ pub fn get_suiup_cache_dir() -> PathBuf {
 }
 
 pub fn get_default_bin_dir() -> PathBuf {
+    // Try to get install_path from config first
+    if let Ok(config_handler) = crate::handlers::config::ConfigHandler::new() {
+        let config = config_handler.get_config();
+        if let Some(ref install_path) = config.install_path {
+            return PathBuf::from(install_path);
+        }
+    }
+
+    // Fallback to default behavior
     #[cfg(windows)]
     {
         let mut path = PathBuf::from(env::var_os("LOCALAPPDATA").expect("LOCALAPPDATA not set"));
@@ -170,6 +179,15 @@ pub fn release_archive_dir() -> PathBuf {
 
 /// Returns the path to the binaries folder
 pub fn binaries_dir() -> PathBuf {
+    // Try to get install_path from config first
+    if let Ok(config_handler) = crate::handlers::config::ConfigHandler::new() {
+        let config = config_handler.get_config();
+        if let Some(ref install_path) = config.install_path {
+            return PathBuf::from(install_path).join("binaries");
+        }
+    }
+
+    // Fallback to default behavior
     get_suiup_data_dir().join("binaries")
 }
 

@@ -245,7 +245,7 @@ mod tests {
         let result = ConfigValue::from_string("auto_cleanup", "true")?;
         assert!(matches!(result, ConfigValue::Boolean(true)));
 
-        let result = ConfigValue::from_string("enable_update_warnings", "false")?;
+        let result = ConfigValue::from_string("disable_update_warnings", "false")?;
         assert!(matches!(result, ConfigValue::Boolean(false)));
 
         let result = ConfigValue::from_string("disable_update_warnings", "true")?;
@@ -282,7 +282,6 @@ mod tests {
         assert_eq!(config.max_cache_size, 1024 * 1024 * 1024); // 1GB
         assert_eq!(config.default_network, "testnet");
         assert_eq!(config.install_path, None);
-        assert_eq!(config.enable_update_warnings, true);
         assert_eq!(config.disable_update_warnings, false);
         assert_eq!(config.github_token, None);
     }
@@ -296,7 +295,6 @@ mod tests {
             max_cache_size: 2147483648, // 2GB
             default_network: "mainnet".to_string(),
             install_path: Some("/custom/path".to_string()),
-            enable_update_warnings: false,
             disable_update_warnings: true,
             github_token: Some("ghp_test_token".to_string()),
         };
@@ -315,7 +313,6 @@ mod tests {
         assert_eq!(deserialized.max_cache_size, config.max_cache_size);
         assert_eq!(deserialized.default_network, config.default_network);
         assert_eq!(deserialized.install_path, config.install_path);
-        assert_eq!(deserialized.enable_update_warnings, config.enable_update_warnings);
         assert_eq!(deserialized.disable_update_warnings, config.disable_update_warnings);
         assert_eq!(deserialized.github_token, config.github_token);
 
@@ -335,7 +332,6 @@ mod tests {
         assert_eq!(config.max_cache_size, 1024 * 1024 * 1024); // default
         assert_eq!(config.default_network, "testnet"); // default
         assert_eq!(config.install_path, None); // default
-        assert_eq!(config.enable_update_warnings, true); // default
         assert_eq!(config.disable_update_warnings, false); // default
         assert_eq!(config.github_token, None); // default
 

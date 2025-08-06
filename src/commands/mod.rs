@@ -14,7 +14,9 @@ mod switch;
 mod update;
 mod which;
 
-use crate::{handlers::self_::check_for_updates, handlers::config::ConfigHandler, types::BinaryVersion};
+use crate::{
+    handlers::config::ConfigHandler, handlers::self_::check_for_updates, types::BinaryVersion,
+};
 
 use anyhow::{anyhow, bail, Result};
 use clap::{Parser, Subcommand, ValueEnum};
@@ -70,12 +72,7 @@ impl Command {
                 match ConfigHandler::new() {
                     Ok(config_handler) => {
                         let config = config_handler.get_config();
-                        // disable_update_warnings takes precedence over enable_update_warnings
-                        if config.disable_update_warnings {
-                            false
-                        } else {
-                            config.enable_update_warnings
-                        }
+                        !config.disable_update_warnings
                     }
                     Err(_) => true, // Default to enabled if config can't be loaded
                 }
@@ -147,11 +144,19 @@ pub enum ComponentCommands {
         nightly: Option<String>,
         #[arg(short, long, help = "Accept defaults without prompting")]
         yes: bool,
-        #[arg(long, value_name = "path", help = "Custom installation path for the binary")]
+        #[arg(
+            long,
+            value_name = "path",
+            help = "Custom installation path for the binary"
+        )]
         path: Option<String>,
         #[arg(long, help = "Enable the tool after installation")]
         enable: bool,
-        #[arg(long, conflicts_with = "enable", help = "Disable the tool after installation")]
+        #[arg(
+            long,
+            conflicts_with = "enable",
+            help = "Disable the tool after installation"
+        )]
         disable: bool,
         #[arg(long, help = "Auto-detect and use existing version if none specified")]
         auto_detect: bool,

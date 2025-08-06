@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
 
-use crate::error::{ErrorContext, print_success, suggest_fix};
+use crate::error::{print_success, suggest_fix, ErrorContext};
 use crate::paths::config_file_path;
 use crate::validation::Validator;
 
@@ -26,8 +26,6 @@ pub struct SuiupConfig {
     pub default_network: String,
     #[serde(default = "default_install_path")]
     pub install_path: Option<String>,
-    #[serde(default = "default_enable_update_warnings")]
-    pub enable_update_warnings: bool,
     #[serde(default = "default_disable_update_warnings")]
     pub disable_update_warnings: bool,
     #[serde(default = "default_github_token")]
@@ -48,13 +46,19 @@ impl ConfigValue {
                 Ok(ConfigValue::String(value.to_string()))
             }
             "cache_days" | "max_cache_size" => {
-                let num = value.parse::<u64>()
+                let num = value
+                    .parse::<u64>()
                     .map_err(|_| anyhow!("Invalid number value for {}: {}", key, value))?;
                 Ok(ConfigValue::Number(num))
             }
-            "auto_cleanup" | "enable_update_warnings" | "disable_update_warnings" => {
-                let bool_val = value.parse::<bool>()
-                    .map_err(|_| anyhow!("Invalid boolean value for {}: {}. Use 'true' or 'false'", key, value))?;
+            "auto_cleanup" | "disable_update_warnings" => {
+                let bool_val = value.parse::<bool>().map_err(|_| {
+                    anyhow!(
+                        "Invalid boolean value for {}: {}. Use 'true' or 'false'",
+                        key,
+                        value
+                    )
+                })?;
                 Ok(ConfigValue::Boolean(bool_val))
             }
             _ => bail!("Unknown configuration key: {}", key),
@@ -83,11 +87,11 @@ fn default_default_network() -> String {
 }
 
 fn default_install_path() -> Option<String> {
-    None
-}
-
-fn default_enable_update_warnings() -> bool {
-    true
+    Some(
+        crate::paths::get_default_bin_dir()
+            .to_string_lossy()
+            .to_string(),
+    )
 }
 
 fn default_disable_update_warnings() -> bool {
@@ -107,7 +111,6 @@ impl Default for SuiupConfig {
             max_cache_size: default_max_cache_size(),
             default_network: default_default_network(),
             install_path: default_install_path(),
-            enable_update_warnings: default_enable_update_warnings(),
             disable_update_warnings: default_disable_update_warnings(),
             github_token: default_github_token(),
         }
@@ -126,7 +129,7 @@ impl ConfigHandler {
 
     fn load_config() -> Result<SuiupConfig> {
         let config_path = config_file_path()?;
-        
+
         if !config_path.exists() {
             let default_config = SuiupConfig::default();
             Self::save_config(&default_config)
@@ -136,16 +139,16 @@ impl ConfigHandler {
 
         let content = fs::read_to_string(&config_path)
             .with_config_context("Failed to read configuration file")?;
-        
+
         let config: SuiupConfig = serde_json::from_str(&content)
             .with_config_context("Configuration file contains invalid JSON. Try 'suiup config reset' to restore defaults")?;
-        
+
         Ok(config)
     }
 
     fn save_config(config: &SuiupConfig) -> Result<()> {
         let config_path = config_file_path()?;
-        
+
         if let Some(parent) = config_path.parent() {
             fs::create_dir_all(parent)
                 .with_fs_context("Failed to create configuration directory")?;
@@ -153,10 +156,9 @@ impl ConfigHandler {
 
         let content = serde_json::to_string_pretty(config)
             .with_config_context("Failed to serialize configuration")?;
-        
-        fs::write(&config_path, content)
-            .with_fs_context("Failed to write configuration file")?;
-        
+
+        fs::write(&config_path, content).with_fs_context("Failed to write configuration file")?;
+
         Ok(())
     }
 
@@ -167,10 +169,17 @@ impl ConfigHandler {
             "auto_cleanup" => self.config.auto_cleanup.to_string(),
             "max_cache_size" => self.config.max_cache_size.to_string(),
             "default_network" => self.config.default_network.clone(),
-            "install_path" => self.config.install_path.clone().unwrap_or_else(|| "default".to_string()),
-            "enable_update_warnings" => self.config.enable_update_warnings.to_string(),
+            "install_path" => self
+                .config
+                .install_path
+                .clone()
+                .unwrap_or_else(|| "default".to_string()),
             "disable_update_warnings" => self.config.disable_update_warnings.to_string(),
-            "github_token" => self.config.github_token.clone().unwrap_or_else(|| "not set".to_string()),
+            "github_token" => self
+                .config
+                .github_token
+                .clone()
+                .unwrap_or_else(|| "not set".to_string()),
             _ => bail!("Unknown configuration key: {}", key),
         };
 
@@ -209,12 +218,11 @@ impl ConfigHandler {
             }
             "install_path" => {
                 if let ConfigValue::String(ref v) = value {
-                    self.config.install_path = if v == "default" { None } else { Some(v.clone()) };
-                }
-            }
-            "enable_update_warnings" => {
-                if let ConfigValue::Boolean(v) = value {
-                    self.config.enable_update_warnings = v;
+                    self.config.install_path = if v == "default" {
+                        None
+                    } else {
+                        Some(v.clone())
+                    };
                 }
             }
             "disable_update_warnings" => {
@@ -224,19 +232,27 @@ impl ConfigHandler {
             }
             "github_token" => {
                 if let ConfigValue::String(ref v) = value {
-                    self.config.github_token = if v == "default" || v.is_empty() { None } else { Some(v.clone()) };
+                    self.config.github_token = if v == "default" || v.is_empty() {
+                        None
+                    } else {
+                        Some(v.clone())
+                    };
                 }
             }
             _ => bail!("Unknown configuration key: {}", key),
         }
 
         Self::save_config(&self.config)?;
-        print_success(&format!("Configuration updated: {} = {}", key.cyan(), match &value {
-            ConfigValue::String(s) => s.clone(),
-            ConfigValue::Number(n) => n.to_string(),
-            ConfigValue::Boolean(b) => b.to_string(),
-        }));
-        
+        print_success(&format!(
+            "Configuration updated: {} = {}",
+            key.cyan(),
+            match &value {
+                ConfigValue::String(s) => s.clone(),
+                ConfigValue::Number(n) => n.to_string(),
+                ConfigValue::Boolean(b) => b.to_string(),
+            }
+        ));
+
         Ok(())
     }
 
@@ -244,15 +260,47 @@ impl ConfigHandler {
         println!("{}", "Current Configuration:".bold().cyan());
         println!("  {} = {}", "mirror_url".yellow(), self.config.mirror_url);
         println!("  {} = {}", "cache_days".yellow(), self.config.cache_days);
-        println!("  {} = {}", "auto_cleanup".yellow(), self.config.auto_cleanup);
-        println!("  {} = {} MB", "max_cache_size".yellow(), self.config.max_cache_size / 1024 / 1024);
-        println!("  {} = {}", "default_network".yellow(), self.config.default_network);
-        println!("  {} = {}", "install_path".yellow(), 
-                 self.config.install_path.as_ref().unwrap_or(&"default".to_string()));
-        println!("  {} = {}", "enable_update_warnings".yellow(), self.config.enable_update_warnings);
-        println!("  {} = {}", "disable_update_warnings".yellow(), self.config.disable_update_warnings);
-        println!("  {} = {}", "github_token".yellow(), 
-                 self.config.github_token.as_ref().map(|t| if t.len() > 8 { format!("{}...", &t[..8]) } else { t.clone() }).unwrap_or_else(|| "not set".to_string()));
+        println!(
+            "  {} = {}",
+            "auto_cleanup".yellow(),
+            self.config.auto_cleanup
+        );
+        println!(
+            "  {} = {} MB",
+            "max_cache_size".yellow(),
+            self.config.max_cache_size / 1024 / 1024
+        );
+        println!(
+            "  {} = {}",
+            "default_network".yellow(),
+            self.config.default_network
+        );
+        println!(
+            "  {} = {}",
+            "install_path".yellow(),
+            self.config
+                .install_path
+                .as_ref()
+                .unwrap_or(&"default".to_string())
+        );
+        println!(
+            "  {} = {}",
+            "disable_update_warnings".yellow(),
+            self.config.disable_update_warnings
+        );
+        println!(
+            "  {} = {}",
+            "github_token".yellow(),
+            self.config
+                .github_token
+                .as_ref()
+                .map(|t| if t.len() > 8 {
+                    format!("{}...", &t[..8])
+                } else {
+                    t.clone()
+                })
+                .unwrap_or_else(|| "not set".to_string())
+        );
         Ok(())
     }
 
@@ -261,7 +309,7 @@ impl ConfigHandler {
             let term = Term::stdout();
             print!("Are you sure you want to reset configuration to defaults? [y/N]: ");
             std::io::stdout().flush()?;
-            
+
             let input = term.read_line()?;
             if !input.trim().to_lowercase().starts_with('y') {
                 println!("Configuration reset cancelled.");
@@ -295,9 +343,6 @@ impl ConfigHandler {
             "install_path" => {
                 self.config.install_path = default_install_path();
             }
-            "enable_update_warnings" => {
-                self.config.enable_update_warnings = default_enable_update_warnings();
-            }
             "disable_update_warnings" => {
                 self.config.disable_update_warnings = default_disable_update_warnings();
             }
@@ -308,7 +353,10 @@ impl ConfigHandler {
         }
 
         Self::save_config(&self.config)?;
-        print_success(&format!("Configuration key '{}' reset to default", key.cyan()));
+        print_success(&format!(
+            "Configuration key '{}' reset to default",
+            key.cyan()
+        ));
         Ok(())
     }
 
@@ -345,7 +393,9 @@ impl ConfigHandler {
         // Validate github_token if specified
         if let Some(ref token) = self.config.github_token {
             if !token.is_empty() {
-                if let Err(e) = self.validate_config_value("github_token", &ConfigValue::String(token.clone())) {
+                if let Err(e) =
+                    self.validate_config_value("github_token", &ConfigValue::String(token.clone()))
+                {
                     errors.push(format!("github_token: {}", e));
                 }
             }
@@ -358,8 +408,14 @@ impl ConfigHandler {
             for error in &errors {
                 println!("  {}", error.red());
             }
-            suggest_fix("validation", "Use 'suiup config set <key> <value>' to fix configuration issues");
-            bail!("Configuration validation failed with {} error(s)", errors.len());
+            suggest_fix(
+                "validation",
+                "Use 'suiup config set <key> <value>' to fix configuration issues",
+            );
+            bail!(
+                "Configuration validation failed with {} error(s)",
+                errors.len()
+            );
         }
 
         Ok(())
@@ -402,9 +458,13 @@ impl ConfigHandler {
                 if let ConfigValue::String(token) = value {
                     if !token.is_empty() && token != "default" {
                         // Basic GitHub token validation - should start with ghp_, gho_, ghu_, ghs_, or ghr_
-                        if !token.starts_with("ghp_") && !token.starts_with("gho_") && 
-                           !token.starts_with("ghu_") && !token.starts_with("ghs_") && 
-                           !token.starts_with("ghr_") && token.len() < 20 {
+                        if !token.starts_with("ghp_")
+                            && !token.starts_with("gho_")
+                            && !token.starts_with("ghu_")
+                            && !token.starts_with("ghs_")
+                            && !token.starts_with("ghr_")
+                            && token.len() < 20
+                        {
                             return Err(anyhow!("Invalid GitHub token format. GitHub tokens should start with 'ghp_', 'gho_', 'ghu_', 'ghs_', or 'ghr_' and be at least 20 characters long."));
                         }
                     }

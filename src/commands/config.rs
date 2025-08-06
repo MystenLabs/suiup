@@ -17,8 +17,7 @@ Available configuration keys:
   max_cache_size       - Maximum cache size in bytes (default: 1073741824)
   default_network      - Default network for installations (default: testnet)
   install_path         - Custom installation path for binaries (default: system default)
-  enable_update_warnings  - Show update notifications (default: true)
-  disable_update_warnings - Disable update notifications (default: false, takes precedence)
+  disable_update_warnings - Disable update notifications (default: false)
   github_token         - GitHub API token for authenticated requests (default: not set)
 
 Examples:
