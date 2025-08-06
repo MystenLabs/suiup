@@ -81,9 +81,11 @@ impl StandaloneInstaller {
             std::fs::create_dir_all(&cache_folder)?;
         }
         #[cfg(not(windows))]
-        let standalone_binary_path = cache_folder.join(format!("{}-{}", self.repo.binary_name(), version));
+        let standalone_binary_path =
+            cache_folder.join(format!("{}-{}", self.repo.binary_name(), version));
         #[cfg(target_os = "windows")]
-        let standalone_binary_path = cache_folder.join(format!("{}-{}.exe", self.repo.binary_name(),version));
+        let standalone_binary_path =
+            cache_folder.join(format!("{}-{}.exe", self.repo.binary_name(), version));
 
         if standalone_binary_path.exists() {
             println!("Binary {}-{version} already installed. Use `suiup default set standalone {version}` to set the default version to the desired one", self.repo.binary_name());
@@ -110,7 +112,13 @@ impl StandaloneInstaller {
             .assets
             .iter()
             .find(|a| a.name.starts_with(&asset_name))
-            .ok_or_else(|| anyhow!("No compatible binary found for your system: {}-{}", os, arch))?;
+            .ok_or_else(|| {
+                anyhow!(
+                    "No compatible binary found for your system: {}-{}",
+                    os,
+                    arch
+                )
+            })?;
 
         download_file(
             &asset.browser_download_url,

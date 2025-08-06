@@ -77,11 +77,18 @@ pub async fn install_component(
             if let Some(branch) = nightly {
                 install_from_nightly(&name, branch, debug, yes).await?;
             } else {
-                install_standalone(version, match name {
-                    BinaryName::Mvr => Repo::Mvr,
-                    BinaryName::LedgerSigner => Repo::LedgerSigner,
-                    _ => return Err(anyhow!("Invalid binary name for standalone installation")),
-                }, yes).await?;
+                install_standalone(
+                    version,
+                    match name {
+                        BinaryName::Mvr => Repo::Mvr,
+                        BinaryName::LedgerSigner => Repo::LedgerSigner,
+                        _ => {
+                            return Err(anyhow!("Invalid binary name for standalone installation"))
+                        }
+                    },
+                    yes,
+                )
+                .await?;
             }
         }
         (_, Some(branch)) => {

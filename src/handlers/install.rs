@@ -9,8 +9,8 @@ use super::version::extract_version_from_release;
 use crate::commands::BinaryName;
 use crate::handlers::download::{download_latest_release, download_release_at_version};
 use crate::handlers::{extract_component, update_after_install};
-use crate::standalone;
 use crate::paths::binaries_dir;
+use crate::standalone;
 use crate::types::{BinaryVersion, InstalledBinaries, Repo};
 use anyhow::anyhow;
 use anyhow::bail;
@@ -163,10 +163,18 @@ pub async fn install_from_nightly(
     Ok(())
 }
 
-pub async fn install_standalone(version: Option<String>, repo: Repo, yes: bool) -> Result<(), Error> {
+pub async fn install_standalone(
+    version: Option<String>,
+    repo: Repo,
+    yes: bool,
+) -> Result<(), Error> {
     let network = "standalone".to_string();
     let binary_name = repo.binary_name();
-    if !check_if_binaries_exist(&binary_name, network.clone(), &version.clone().unwrap_or_default())? {
+    if !check_if_binaries_exist(
+        &binary_name,
+        network.clone(),
+        &version.clone().unwrap_or_default(),
+    )? {
         let mut installer = standalone::StandaloneInstaller::new(repo);
         let installed_version = installer.download_version(version).await?;
 
