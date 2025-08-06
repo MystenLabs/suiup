@@ -88,7 +88,6 @@ pub fn update_after_install(
         } else {
             binary.clone()
         };
-
         let binary_path = if version == "nightly" {
             // cargo install places the binary in a `bin` folder
             binaries_dir()
@@ -102,8 +101,11 @@ pub fn update_after_install(
         };
 
         #[cfg(target_os = "windows")]
-        let binary_path = binary_path.with_extension("exe");
-
+        let binary_path = {
+            let original = binary_path.to_string_lossy();
+            PathBuf::from(format!("{}.exe", original))
+        };
+        // println!("binary_path:{:?}",binary_path);
         if !binary_path.exists() {
             println!(
                 "Binary not found at {}. Skipping default version update.",
