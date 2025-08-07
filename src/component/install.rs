@@ -5,11 +5,11 @@ use anyhow::{anyhow, Result};
 use std::fs::create_dir_all;
 
 use crate::commands::BinaryName;
-use crate::handlers::install::{install_from_nightly, install_from_release, install_mvr};
-use crate::handlers::config::ConfigHandler;
-use crate::paths::{binaries_dir, get_default_bin_dir};
-use crate::types::{Repo, Version, InstalledBinaries};
 use crate::handlers::cleanup::{auto_cleanup_cache, CacheConfig};
+use crate::handlers::config::ConfigHandler;
+use crate::handlers::install::{install_from_nightly, install_from_release, install_standalone};
+use crate::paths::{binaries_dir, get_default_bin_dir};
+use crate::types::{InstalledBinaries, Repo, Version};
 
 /// Tool status management for enable/disable functionality
 #[allow(dead_code)]
@@ -47,7 +47,11 @@ fn detect_existing_version(name: &BinaryName, network: &str) -> Result<Option<Ve
 
 /// Set tool enable/disable status
 fn set_tool_status(name: &BinaryName, enabled: bool) -> Result<()> {
-    println!("Setting {} tool status to: {}", name, if enabled { "enabled" } else { "disabled" });
+    println!(
+        "Setting {} tool status to: {}",
+        name,
+        if enabled { "enabled" } else { "disabled" }
+    );
     // For now, this is a placeholder. In a real implementation, this might:
     // - Update a configuration file
     // - Modify PATH entries
@@ -147,13 +151,22 @@ pub async fn install_component(
                 .await?;
             }
         }
-
         (BinaryName::Mvr, nightly) => {
             create_dir_all(installed_bins_dir.join("standalone"))?;
             if let Some(branch) = nightly {
                 install_from_nightly(&name, branch, debug, yes).await?;
             } else {
-                install_mvr(version, yes).await?;
+                install_standalone(
+                    version,
+                    match name {
+                        BinaryName::Mvr => Repo::Mvr,
+                        _ => {
+                            return Err(anyhow!("Invalid binary name for standalone installation"))
+                        }
+                    },
+                    yes,
+                )
+                .await?;
             }
         }
         (_, Some(branch)) => {
