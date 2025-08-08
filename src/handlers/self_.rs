@@ -96,7 +96,7 @@ impl Display for Ver {
     }
 }
 
-pub async fn handle_update() -> Result<()> {
+pub async fn handle_update(github_token: Option<String>) -> Result<()> {
     // find the current binary version
     let current_exe = std::env::current_exe()?;
     let current_version = Command::new(&current_exe).arg("--version").output()?.stdout;
@@ -119,11 +119,38 @@ pub async fn handle_update() -> Result<()> {
     let current_version = Ver::from_str(split[1])?;
 
     // find the latest version on github in releases
-    let repo = "https://api.github.com/repos/MystenLabs/suiup/releases/latest";
+    // Use configured mirror URL or default
+    let (api_url, mirror_url) = match crate::handlers::config::ConfigHandler::new() {
+        Ok(config_handler) => {
+            let config = config_handler.get_config();
+            let base_url = if config.mirror_url.ends_with('/') {
+                config.mirror_url.trim_end_matches('/').to_string()
+            } else {
+                config.mirror_url.clone()
+            };
+            
+            let api_url = if base_url.contains("github.com") {
+                base_url.replace("github.com", "api.github.com/repos")
+            } else {
+                format!("{}/api/v1/repos", base_url)
+            };
+            (format!("{}/MystenLabs/suiup/releases/latest", api_url), base_url)
+        }
+        Err(_) => (
+            "https://api.github.com/repos/MystenLabs/suiup/releases/latest".to_string(), 
+            "https://github.com".to_string()
+        ),
+    };
+    
     let client = reqwest::Client::new();
-    let response = client
-        .get(repo)
-        .header("User-Agent", "suiup")
+    let mut request = client.get(&api_url).header("User-Agent", "suiup");
+    
+    // Add authorization header if token is provided
+    if let Some(token) = &github_token {
+        request = request.header("Authorization", format!("token {}", token));
+    }
+    
+    let response = request
         .send()
         .await?
         .json::<serde_json::Value>()
@@ -141,16 +168,13 @@ pub async fn handle_update() -> Result<()> {
         println!("Updating to latest version: {}", latest_version);
     }
 
-    // download the latest version from github
-    // https://github.com/MystenLabs/suiup/releases/download/v0.0.1/suiup-Linux-musl-x86_64.tar.gz
-
+    // download the latest version from github using configured mirror
     let archive_name = find_archive_name()?;
-    let url =
-        format!("https://github.com/MystenLabs/suiup/releases/download/{tag}/{archive_name}",);
+    let url = format!("{}/MystenLabs/suiup/releases/download/{}/{}", mirror_url, tag, archive_name);
 
     let temp_dir = tempfile::tempdir()?;
     let archive_path = temp_dir.path().join(&archive_name);
-    download_file(&url, &temp_dir.path().join(archive_name), "suiup", None).await?;
+    download_file(&url, &temp_dir.path().join(archive_name), "suiup", github_token).await?;
 
     // extract the archive
     let file = File::open(archive_path.as_path())

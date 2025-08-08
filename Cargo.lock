@@ -1545,6 +1545,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
+ "url",
  "whoami",
 ]
 

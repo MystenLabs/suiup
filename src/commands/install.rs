@@ -5,6 +5,7 @@ use anyhow::Result;
 use clap::Args;
 
 use crate::handle_commands::handle_cmd;
+use crate::handlers::config::ConfigHandler;
 
 use super::ComponentCommands;
 
@@ -29,16 +30,45 @@ pub struct Command {
     /// Accept defaults without prompting
     #[arg(short, long)]
     yes: bool,
+
+    /// Custom installation path for the binary
+    #[arg(long, value_name = "path")]
+    path: Option<String>,
+
+    /// Enable the tool after installation
+    #[arg(long)]
+    enable: bool,
+
+    /// Disable the tool after installation
+    #[arg(long, conflicts_with = "enable")]
+    disable: bool,
+
+    /// Auto-detect and use existing version if none specified
+    #[arg(long)]
+    auto_detect: bool,
 }
 
 impl Command {
     pub async fn exec(&self, github_token: &Option<String>) -> Result<()> {
+        let component = if self.component.contains('@') || self.component.contains('=') {
+            self.component.to_owned()
+        } else {
+            // If no version specified, use default network from config
+            let config_handler = ConfigHandler::new()?;
+            let config = config_handler.get_config();
+            format!("{}@{}", self.component, config.default_network)
+        };
+
         handle_cmd(
             ComponentCommands::Add {
-                component: self.component.to_owned(),
+                component,
                 nightly: self.nightly.to_owned(),
                 debug: self.debug.to_owned(),
                 yes: self.yes.to_owned(),
+                path: self.path.to_owned(),
+                enable: self.enable.to_owned(),
+                disable: self.disable.to_owned(),
+                auto_detect: self.auto_detect.to_owned(),
             },
             github_token.to_owned(),
         )
