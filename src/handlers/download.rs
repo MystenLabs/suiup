@@ -11,6 +11,7 @@ use anyhow::{anyhow, bail, Error};
 use futures_util::StreamExt;
 use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
 use md5::Context;
+use sha2::{Digest, Sha256};
 use reqwest::{
     header::{HeaderMap, HeaderValue, USER_AGENT},
     Client,
@@ -20,6 +21,67 @@ use std::io::Read;
 use std::{cmp::min, io::Write, path::PathBuf, time::Instant};
 
 use tracing::debug;
+
+/// Verifies file integrity using available checksum files
+/// Prioritizes SHA256 over MD5 for better security
+fn verify_file_integrity(file_path: &PathBuf, name: &str) -> Result<bool, Error> {
+    let sha256_path = file_path.with_extension("sha256");
+    let md5_path = file_path.with_extension("md5");
+    
+    // Prefer SHA256 if available
+    if sha256_path.exists() {
+        let mut file = File::open(file_path)?;
+        let mut hasher = Sha256::new();
+        let mut buffer = [0u8; 8192];
+        loop {
+            let n = file.read(&mut buffer)?;
+            if n == 0 {
+                break;
+            }
+            hasher.update(&buffer[..n]);
+        }
+        let result = hasher.finalize();
+        let local_sha256 = format!("{:x}", result);
+        let expected_sha256 = std::fs::read_to_string(sha256_path)?.trim().to_string();
+        
+        if local_sha256 == expected_sha256 {
+            println!("SHA256 check passed for {name}");
+            return Ok(true);
+        } else {
+            println!("SHA256 mismatch for {name}: expected {}, got {}", expected_sha256, local_sha256);
+            return Ok(false);
+        }
+    }
+    
+    // Fall back to MD5 if SHA256 not available
+    if md5_path.exists() {
+        let mut file = File::open(file_path)?;
+        let mut hasher = Context::new();
+        let mut buffer = [0u8; 8192];
+        loop {
+            let n = file.read(&mut buffer)?;
+            if n == 0 {
+                break;
+            }
+            hasher.consume(&buffer[..n]);
+        }
+        let result = hasher.finalize();
+        let local_md5 = format!("{:x}", result);
+        let expected_md5 = std::fs::read_to_string(md5_path)?.trim().to_string();
+        
+        if local_md5 == expected_md5 {
+            println!("MD5 check passed for {name}");
+            return Ok(true);
+        } else {
+            println!("MD5 mismatch for {name}: expected {}, got {}", expected_md5, local_md5);
+            return Ok(false);
+        }
+    }
+    
+    // No checksum files available
+    println!("No checksum files (.sha256 or .md5) found for {name}");
+    Ok(true) // Allow download without verification if no checksums available
+}
 
 /// Generate helpful error message with network suggestions
 /// Note: This is only applicable for sui and walrus. MVR binary is standalone, not tied to a network.
@@ -237,31 +299,18 @@ pub async fn download_file(
 
     if download_to.exists() {
         if download_to.metadata()?.len() == total_size {
-            // Check md5 if .md5 file exists
-            let md5_path = download_to.with_extension("md5");
-            if md5_path.exists() {
-                let mut file = File::open(download_to)?;
-                let mut hasher = Context::new();
-                let mut buffer = [0u8; 8192];
-                loop {
-                    let n = file.read(&mut buffer)?;
-                    if n == 0 {
-                        break;
-                    }
-                    hasher.consume(&buffer[..n]);
-                }
-                let result = hasher.finalize();
-                let local_md5 = format!("{:x}", result);
-                let expected_md5 = std::fs::read_to_string(md5_path)?.trim().to_string();
-                if local_md5 == expected_md5 {
-                    println!("Found {name} in cache, md5 verified");
+            // Check integrity using available checksum files (SHA256 preferred, MD5 fallback)
+            match verify_file_integrity(download_to, name) {
+                Ok(true) => {
+                    println!("Found {name} in cache, checksum verified");
                     return Ok(name.to_string());
-                } else {
-                    println!("MD5 mismatch for {name}, re-downloading...");
                 }
-            } else {
-                println!("Found {name} in cache (no md5 to check)");
-                return Ok(name.to_string());
+                Ok(false) => {
+                    println!("Checksum mismatch for {name}, re-downloading...");
+                }
+                Err(e) => {
+                    println!("Error verifying {name}: {}, re-downloading...", e);
+                }
             }
         }
         std::fs::remove_file(download_to)?;
@@ -294,29 +343,16 @@ pub async fn download_file(
 
     pb.finish_with_message("Download complete");
 
-    // After download, check md5 if .md5 file exists
-    let md5_path = download_to.with_extension("md5");
-    if md5_path.exists() {
-        let mut file = File::open(download_to)?;
-        let mut hasher = Context::new();
-        let mut buffer = [0u8; 8192];
-        loop {
-            let n = file.read(&mut buffer)?;
-            if n == 0 {
-                break;
-            }
-            hasher.consume(&buffer[..n]);
+    // After download, verify integrity using available checksum files
+    match verify_file_integrity(download_to, name) {
+        Ok(true) => {
+            // Checksum verification passed or no checksums available
         }
-        let result = hasher.finalize();
-        let local_md5 = format!("{:x}", result);
-        let expected_md5 = std::fs::read_to_string(md5_path)?.trim().to_string();
-        if local_md5 != expected_md5 {
-            return Err(anyhow!(format!(
-                "MD5 check failed for {}: expected {}, got {}",
-                name, expected_md5, local_md5
-            )));
-        } else {
-            println!("MD5 check passed for {name}");
+        Ok(false) => {
+            return Err(anyhow!("Checksum verification failed for {}", name));
+        }
+        Err(e) => {
+            return Err(anyhow!("Error during checksum verification for {}: {}", name, e));
         }
     }
 
