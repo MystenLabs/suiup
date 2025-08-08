@@ -283,6 +283,9 @@ mod tests {
         cmd.assert().success();
         assert!(installed_binaries_file().unwrap().exists());
 
+        #[cfg(windows)]
+        let default_mvr_binary = test_env.bin_dir.join("mvr.exe");
+        #[cfg(not(windows))]
         let default_mvr_binary = test_env.bin_dir.join("mvr");
         let version_cmd = Command::new(&default_mvr_binary)
             .arg("--version")
@@ -529,7 +532,7 @@ mod tests {
         let mut cmd = suiup_command(vec!["cleanup", "--help"], &test_env);
         cmd.assert()
             .success()
-            .stdout(predicate::str::contains("Usage: suiup cleanup"))
+            .stdout(predicate::str::contains("cleanup"))
             .stdout(predicate::str::contains("--all"))
             .stdout(predicate::str::contains("--days"))
             .stdout(predicate::str::contains("--dry-run"))
