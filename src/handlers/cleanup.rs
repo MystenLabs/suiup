@@ -53,37 +53,39 @@ pub async fn handle_cleanup(all: bool, days: u32, dry_run: bool) -> Result<()> {
         for entry in entries {
             let entry = entry?;
             let path = entry.path();
-            if path.is_file() {
-                if let Ok(metadata) = fs::metadata(&path) {
-                    if let Ok(modified_time) = metadata.modified() {
-                        if let Ok(age) = SystemTime::now().duration_since(modified_time) {
-                            // Convert to days for display
-                            let days_old = age.as_secs() / (60 * 60 * 24);
 
-                            if age > cutoff_duration {
-                                let file_size = metadata.len();
-                                cleaned_size += file_size;
-                                files_removed += 1;
+            if !path.is_file() {
+                continue;
+            }
 
-                                if dry_run {
-                                    println!(
-                                        "Would remove: {} ({} days old, {})",
-                                        path.display(),
-                                        days_old,
-                                        format_file_size(file_size)
-                                    );
-                                } else {
-                                    println!(
-                                        "Removing: {} ({} days old, {})",
-                                        path.display(),
-                                        days_old,
-                                        format_file_size(file_size)
-                                    );
-                                    fs::remove_file(path)?;
-                                }
-                            }
-                        }
-                    }
+            // Get file metadata and age
+            let metadata = fs::metadata(&path)?;
+            let modified_time = metadata.modified()?;
+            let age = SystemTime::now().duration_since(modified_time)?;
+
+            // Convert to days for display
+            let days_old = age.as_secs() / (60 * 60 * 24);
+
+            if age > cutoff_duration {
+                let file_size = metadata.len();
+                cleaned_size += file_size;
+                files_removed += 1;
+
+                if dry_run {
+                    println!(
+                        "Would remove: {} ({} days old, {})",
+                        path.display(),
+                        days_old,
+                        format_file_size(file_size)
+                    );
+                } else {
+                    println!(
+                        "Removing: {} ({} days old, {})",
+                        path.display(),
+                        days_old,
+                        format_file_size(file_size)
+                    );
+                    fs::remove_file(path)?;
                 }
             }
         }
@@ -112,16 +114,19 @@ pub async fn handle_cleanup(all: bool, days: u32, dry_run: bool) -> Result<()> {
 }
 
 fn calculate_dir_size(dir: &PathBuf) -> Result<u64> {
+    if !dir.exists() {
+        return Ok(0);
+    }
+
     let mut total_size = 0;
-    if dir.exists() {
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_file() {
-                total_size += fs::metadata(&path)?.len();
-            } else if path.is_dir() {
-                total_size += calculate_dir_size(&path)?;
-            }
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.is_file() {
+            total_size += fs::metadata(&path)?.len();
+        } else if path.is_dir() {
+            total_size += calculate_dir_size(&path)?;
         }
     }
     Ok(total_size)

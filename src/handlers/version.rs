@@ -2,11 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, Error};
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref VERSION_REGEX: regex::Regex = regex::Regex::new(r"v\d+\.\d+\.\d+").unwrap();
+}
 
 /// Extracts the version from a release filename
 pub fn extract_version_from_release(release: &str) -> Result<String, Error> {
-    let re = regex::Regex::new(r"v\d+\.\d+\.\d+").unwrap();
-    let captures = re
+    let captures = VERSION_REGEX
         .captures(release)
         .ok_or_else(|| anyhow!("Could not extract version from release"))?;
 

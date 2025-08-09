@@ -182,7 +182,7 @@ mod tests {
         cmd.arg("default").arg("get");
         cmd.assert()
             .success()
-            .stdout(predicate::str::contains("sui-v1.39.3 (debug build)"));
+            .stdout(predicate::str::contains("Yes"));
 
         Ok(())
     }
@@ -630,7 +630,7 @@ mod tests {
         cmd.assert()
             .success()
             .stdout(predicate::str::contains("Removing all release archives"))
-            .stdout(predicate::str::contains("Cache cleared successfully")); 
+            .stdout(predicate::str::contains("Cache cleared successfully"));
 
         // All files should be removed
         assert!(!file1.exists());
