@@ -527,9 +527,15 @@ mod tests {
         let test_env = TestEnv::new()?;
 
         let mut cmd = suiup_command(vec!["cleanup", "--help"], &test_env);
+
+        #[cfg(windows)]
+        let usage_pattern = "Usage: suiup.exe cleanup";
+        #[cfg(not(windows))]
+        let usage_pattern = "Usage: suiup cleanup";
+
         cmd.assert()
             .success()
-            .stdout(predicate::str::contains("Usage: suiup cleanup"))
+            .stdout(predicate::str::contains(usage_pattern))
             .stdout(predicate::str::contains("--all"))
             .stdout(predicate::str::contains("--days"))
             .stdout(predicate::str::contains("--dry-run"))
