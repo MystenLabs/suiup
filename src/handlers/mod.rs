@@ -101,7 +101,10 @@ pub fn update_after_install(
         };
 
         #[cfg(target_os = "windows")]
-        let binary_path = binary_path.with_extension("exe");
+        let binary_path = {
+            let original = binary_path.to_string_lossy();
+            PathBuf::from(format!("{}.exe", original))
+        };
 
         if !binary_path.exists() {
             println!(
