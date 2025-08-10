@@ -21,6 +21,7 @@ use tar::Archive;
 use version::extract_version_from_release;
 
 pub mod cleanup;
+pub mod config;
 pub mod download;
 pub mod install;
 pub mod release;

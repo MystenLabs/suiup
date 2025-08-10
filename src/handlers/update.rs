@@ -74,6 +74,7 @@ pub async fn handle_update(
                 debug: false,
                 nightly: None,
                 yes,
+                path: None,
             },
             github_token,
         )
@@ -88,6 +89,7 @@ pub async fn handle_update(
                 debug: false,
                 nightly: None,
                 yes,
+                path: None,
             },
             github_token,
         )
@@ -116,6 +118,7 @@ pub async fn handle_update(
                 debug: false,
                 nightly: None,
                 yes,
+                path: None,
             },
             github_token.clone(),
         )

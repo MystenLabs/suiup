@@ -33,14 +33,15 @@ impl ComponentManager {
                 nightly,
                 debug,
                 yes,
+                path,
             } => {
                 let command_metadata = parse_component_with_version(&component)?;
-                self.install_component(command_metadata, nightly, debug, yes)
+                self.install_component(command_metadata, nightly, debug, yes, path)
                     .await
             }
             ComponentCommands::Remove { binary } => self.remove_component(binary).await,
-            ComponentCommands::Cleanup { all, days, dry_run } => {
-                self.handle_cleanup(all, days, dry_run).await
+            ComponentCommands::Cleanup { all, days, dry_run, smart } => {
+                self.handle_cleanup(all, days, dry_run, smart).await
             }
         }
     }
@@ -57,6 +58,7 @@ impl ComponentManager {
         nightly: Option<String>,
         debug: bool,
         yes: bool,
+        path: Option<String>,
     ) -> Result<()> {
         let CommandMetadata {
             name,
@@ -70,6 +72,7 @@ impl ComponentManager {
             nightly,
             debug,
             yes,
+            path,
             self.github_token.clone(),
         )
         .await
@@ -86,7 +89,7 @@ impl ComponentManager {
     }
 
     /// Handle cleanup operations
-    async fn handle_cleanup(&self, all: bool, days: u32, dry_run: bool) -> Result<()> {
-        crate::handlers::cleanup::handle_cleanup(all, days, dry_run).await
+    async fn handle_cleanup(&self, all: bool, days: u32, dry_run: bool,smart:bool) -> Result<()> {
+        crate::handlers::cleanup::handle_cleanup_advanced(all, days, dry_run,smart).await
     }
 }
