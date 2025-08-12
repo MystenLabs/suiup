@@ -40,26 +40,6 @@ impl Repo {
     pub fn binary_name(&self) -> &str {
         &self.binary_name
     }
-
-    /// Creates a Repo for Sui (backward compatibility)
-    pub fn sui() -> Result<Self, Error> {
-        Self::from_binary_name("sui")
-    }
-
-    /// Creates a Repo for MVR (backward compatibility)
-    pub fn mvr() -> Result<Self, Error> {
-        Self::from_binary_name("mvr")
-    }
-
-    /// Creates a Repo for Walrus (backward compatibility)
-    pub fn walrus() -> Result<Self, Error> {
-        Self::from_binary_name("walrus")
-    }
-
-    /// Creates a Repo for WalrusSites (backward compatibility)
-    pub fn walrus_sites() -> Result<Self, Error> {
-        Self::from_binary_name("site-builder")
-    }
 }
 
 impl Display for Repo {

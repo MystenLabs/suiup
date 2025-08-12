@@ -19,6 +19,7 @@ use std::fs::File;
 use std::io::Read;
 use std::{cmp::min, io::Write, path::PathBuf, time::Instant};
 
+use crate::config::load_config;
 use tracing::debug;
 
 /// Generate helpful error message with network suggestions
@@ -32,8 +33,9 @@ fn generate_network_suggestions_error(
     let binary_name = repo.binary_name();
 
     use crate::config::get_binary_config;
+    load_config();
     let bin_config = get_binary_config(binary_name).ok();
-    
+
     // Check if this binary doesn't use networks (like MVR)
     if let Some(config) = &bin_config {
         if config.supported_networks.is_empty() {
@@ -82,7 +84,11 @@ fn generate_network_suggestions_error(
         let available_networks: Vec<String> = if let Some(config) = &bin_config {
             config.supported_networks.clone()
         } else {
-            vec!["testnet".to_string(), "devnet".to_string(), "mainnet".to_string()]
+            vec![
+                "testnet".to_string(),
+                "devnet".to_string(),
+                "mainnet".to_string(),
+            ]
         }
         .iter()
         .filter(|&net| {
@@ -365,7 +371,10 @@ async fn download_asset_from_github(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{Asset, Release};
+    use crate::{
+        config::{get_config, load_config},
+        types::{Asset, Release},
+    };
 
     fn create_test_release(asset_names: Vec<&str>) -> Release {
         Release {
@@ -380,21 +389,18 @@ mod tests {
     }
 
     #[test]
-    fn test_binary_name() {
-        assert_eq!(Repo::Sui.binary_name(), "sui");
-        assert_eq!(Repo::Walrus.binary_name(), "walrus");
-        assert_eq!(Repo::Mvr.binary_name(), "mvr");
-    }
-
-    #[test]
     fn test_generate_network_suggestions_error_with_version() {
         let releases = vec![
             create_test_release(vec!["sui-devnet-v1.53.0-linux-x86_64.tgz"]),
             create_test_release(vec!["sui-mainnet-v1.53.0-linux-x86_64.tgz"]),
         ];
 
-        let error =
-            generate_network_suggestions_error(&Repo::Sui, &releases, Some("1.53.0"), "testnet");
+        let error = generate_network_suggestions_error(
+            &Repo::from_binary_name("sui").unwrap(),
+            &releases,
+            Some("1.53.0"),
+            "testnet",
+        );
         let error_msg = error.to_string();
 
         assert!(error_msg.contains("Release testnet-1.53.0 not found"));
@@ -410,7 +416,12 @@ mod tests {
             create_test_release(vec!["walrus-mainnet-v1.54.0-linux-x86_64.tgz"]),
         ];
 
-        let error = generate_network_suggestions_error(&Repo::Sui, &releases, None, "testnet");
+        let error = generate_network_suggestions_error(
+            &Repo::from_binary_name("sui").unwrap(),
+            &releases,
+            None,
+            "testnet",
+        );
         let error_msg = error.to_string();
 
         assert!(error_msg.contains("No releases found for testnet network"));
@@ -422,8 +433,12 @@ mod tests {
     #[test]
     fn test_generate_network_suggestions_error_mvr_with_version() {
         let releases = vec![];
-        let error =
-            generate_network_suggestions_error(&Repo::Mvr, &releases, Some("1.0.0"), "standalone");
+        let error = generate_network_suggestions_error(
+            &Repo::from_binary_name("mvr").unwrap(),
+            &releases,
+            Some("1.0.0"),
+            "standalone",
+        );
         let error_msg = error.to_string();
 
         assert!(error_msg.contains("MVR version 1.0.0 not found"));
@@ -434,11 +449,16 @@ mod tests {
     #[test]
     fn test_generate_network_suggestions_error_mvr_without_version() {
         let releases = vec![];
-        let error = generate_network_suggestions_error(&Repo::Mvr, &releases, None, "standalone");
+        let error = generate_network_suggestions_error(
+            &Repo::from_binary_name("mvr").unwrap(),
+            &releases,
+            None,
+            "standalone",
+        );
         let error_msg = error.to_string();
 
-        assert!(error_msg.contains("MVR release not found"));
-        assert!(error_msg.contains("MVR is a standalone binary"));
+        assert!(error_msg.contains("mvr release not found"));
+        assert!(error_msg.contains("mvr is a standalone binary"));
         assert!(error_msg.contains("suiup install mvr"));
     }
 }

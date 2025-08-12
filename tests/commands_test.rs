@@ -6,17 +6,17 @@ mod tests {
     use anyhow::Result;
     use std::fs;
     use std::time::{Duration, SystemTime};
-    use suiup::commands::{parse_component_with_version, BinaryName, CommandMetadata};
+    use suiup::commands::{parse_component_with_version, CommandMetadata};
     use suiup::handlers::cleanup::handle_cleanup;
+    use suiup::handlers::switch::parse_binary_spec;
     use suiup::paths;
     use tempfile::TempDir;
-    use suiup::handlers::switch::parse_binary_spec;
 
     #[test]
     fn test_parse_component_with_version() -> Result<(), anyhow::Error> {
         let result = parse_component_with_version("sui")?;
         let expected = CommandMetadata {
-            name: BinaryName::Sui,
+            name: "sui".to_string(),
             network: "testnet".to_string(),
             version: None,
         };
@@ -24,7 +24,7 @@ mod tests {
 
         let result = parse_component_with_version("sui@testnet-v1.39.3")?;
         let expected = CommandMetadata {
-            name: BinaryName::Sui,
+            name: "sui".to_string(),
             network: "testnet".to_string(),
             version: Some("v1.39.3".to_string()),
         };
@@ -32,7 +32,7 @@ mod tests {
 
         let result = parse_component_with_version("walrus")?;
         let expected = CommandMetadata {
-            name: BinaryName::Walrus,
+            name: "walrus".to_string(),
             network: "testnet".to_string(),
             version: None,
         };
@@ -40,7 +40,7 @@ mod tests {
 
         let result = parse_component_with_version("mvr")?;
         let expected = CommandMetadata {
-            name: BinaryName::Mvr,
+            name: "mvr".to_string(),
             network: "testnet".to_string(),
             version: None,
         };
@@ -54,13 +54,6 @@ mod tests {
         );
 
         Ok(())
-    }
-
-    #[test]
-    fn test_sui_component_display() {
-        assert_eq!(BinaryName::Sui.to_string(), "sui");
-        assert_eq!(BinaryName::Mvr.to_string(), "mvr");
-        assert_eq!(BinaryName::Walrus.to_string(), "walrus");
     }
 
     #[test]
