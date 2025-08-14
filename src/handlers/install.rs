@@ -88,7 +88,8 @@ pub async fn install_from_nightly(
     yes: bool,
 ) -> Result<(), Error> {
     println!("Installing {name} from {branch} branch");
-    check_cargo_rust_installed()?;
+    check_command_installed("rustc")?;
+    check_command_installed("cargo")?;
 
     let pb = ProgressBar::new_spinner();
     pb.set_style(
@@ -199,32 +200,19 @@ pub async fn install_standalone(
     Ok(())
 }
 
-fn check_cargo_rust_installed() -> Result<(), Error> {
-    if let Ok(output) = Command::new("rustc").arg("--version").output() {
+fn check_command_installed(command: &str) -> Result<(), Error> {
+    if let Ok(output) = Command::new(command).arg("--version").output() {
         if output.status.success() {
             print!(
-                "Rust is installed: {}",
+                "{} is installed: {}",
+                command,
                 String::from_utf8_lossy(&output.stdout)
             );
         } else {
-            bail!("Rust is not installed");
+            bail!("{} is not installed", command);
         }
     } else {
-        bail!("Failed to execute rustc command");
-    }
-
-    // Check if cargo is installed
-    if let Ok(output) = Command::new("cargo").arg("--version").output() {
-        if output.status.success() {
-            print!(
-                "Cargo is installed: {}",
-                String::from_utf8_lossy(&output.stdout)
-            );
-        } else {
-            bail!("Cargo is not installed");
-        }
-    } else {
-        bail!("Failed to execute cargo command");
+        bail!("Failed to execute {} command", command);
     }
     Ok(())
 }
