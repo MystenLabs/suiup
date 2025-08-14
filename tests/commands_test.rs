@@ -116,7 +116,8 @@ mod tests {
     #[tokio::test]
     async fn test_cleanup_dry_run() -> Result<()> {
         let temp_dir = TempDir::new()?;
-        let cache_dir = temp_dir.path().join("suiup").join("release_archives");
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+        let cache_dir = paths::release_archive_dir();
         fs::create_dir_all(&cache_dir)?;
 
         // Create test files with different ages
@@ -197,6 +198,30 @@ mod tests {
         assert!(!file2.exists());
         assert!(cache_dir.exists()); // Directory should still exist
 
+        Ok(())
+    }
+    #[tokio::test]
+    async fn test_release_archive_dir_created_by_initialize() -> Result<()> {
+        let temp_dir = TempDir::new()?;
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+        std::env::set_var("XDG_DATA_HOME", temp_dir.path());
+        std::env::set_var("XDG_CONFIG_HOME", temp_dir.path());
+
+        // Directory should not exist yet
+        let dir_before = paths::release_archive_dir();
+        if dir_before.exists() {
+            // Ensure clean state
+            std::fs::remove_dir_all(&dir_before)?;
+        }
+        assert!(!dir_before.exists());
+
+        // Initialize will create it
+        paths::initialize()?;
+        let dir_after = paths::release_archive_dir();
+        assert!(
+            dir_after.exists(),
+            "release archive dir should be created by initialize()"
+        );
         Ok(())
     }
 }
