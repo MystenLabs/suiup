@@ -240,7 +240,7 @@ async fn check_network_connectivity(check: &mut impl FnMut(&str, Result<String, 
 fn check_installed_binaries(check: &mut impl FnMut(&str, Result<String, String>)) {
     // First check suiup itself
     check_suiup_installation(check);
-    
+
     // Then check registered binaries
     check_registered_binaries(check);
 }
@@ -251,24 +251,21 @@ fn check_suiup_installation(check: &mut impl FnMut(&str, Result<String, String>)
     let which_cmd = "which";
     #[cfg(windows)]
     let which_cmd = "where";
-    
+
     if let Ok(output) = std::process::Command::new(which_cmd).arg("suiup").output() {
         if output.status.success() {
             let suiup_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            check(
-                "suiup binary",
-                Ok(format!("found at {}", suiup_path))
-            );
+            check("suiup binary", Ok(format!("found at {}", suiup_path)));
         } else {
             check(
-                "suiup binary", 
-                Err("WARN: suiup not found in PATH".to_string())
+                "suiup binary",
+                Err("WARN: suiup not found in PATH".to_string()),
             );
         }
     } else {
         check(
             "suiup binary",
-            Err("WARN: Unable to check suiup installation".to_string())
+            Err("WARN: Unable to check suiup installation".to_string()),
         );
     }
 }
@@ -297,7 +294,8 @@ fn check_registered_binaries(check: &mut impl FnMut(&str, Result<String, String>
                 } else {
                     check(
                         "Registered binaries",
-                        Ok(format!("All {} binaries are valid: {}", 
+                        Ok(format!(
+                            "All {} binaries are valid: {}",
                             valid_binaries.len(),
                             valid_binaries.join(", ")
                         )),
@@ -310,12 +308,12 @@ fn check_registered_binaries(check: &mut impl FnMut(&str, Result<String, String>
                 } else {
                     valid_binaries.join(", ")
                 };
-                
+
                 check(
                     "Registered binaries",
                     Err(format!(
                         "WARN: {} valid, {} missing/invalid. Valid: {}. Missing/Invalid: {}",
-                        valid_binaries.len(), 
+                        valid_binaries.len(),
                         invalid_binaries.len(),
                         valid_list,
                         invalid_list

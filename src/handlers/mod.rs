@@ -20,6 +20,7 @@ use std::os::unix::fs::PermissionsExt;
 use tar::Archive;
 use version::extract_version_from_release;
 
+pub mod cleanup;
 pub mod download;
 pub mod install;
 pub mod release;
@@ -29,7 +30,6 @@ pub mod switch;
 pub mod update;
 pub mod version;
 pub mod which;
-pub mod cleanup;
 
 pub const RELEASES_ARCHIVES_FOLDER: &str = "releases";
 

@@ -39,7 +39,9 @@ impl ComponentManager {
                     .await
             }
             ComponentCommands::Remove { binary } => self.remove_component(binary).await,
-            ComponentCommands::Cleanup { all, days, dry_run } => self.handle_cleanup(all, days, dry_run).await
+            ComponentCommands::Cleanup { all, days, dry_run } => {
+                self.handle_cleanup(all, days, dry_run).await
+            }
         }
     }
 
