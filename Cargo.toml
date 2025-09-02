@@ -7,7 +7,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.98"
 clap = { version = "4.5.41", features = ["derive", "env"] }
-clap_complete = "4.5.52"
+clap_complete = "4.5.57"
 colored = "3.0.0"
 comfy-table = "7.1.4"
 console = { version = "0.16.0", features = ["windows-console-colors"] }
