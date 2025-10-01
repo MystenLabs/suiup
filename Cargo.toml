@@ -24,7 +24,7 @@ reqwest = { version = "0.12.22", default-features = false, features = ["blocking
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.140"
 tar = "0.4.44"
-tempfile = "3.20"
+tempfile = "3.23"
 filetime = "0.2"
 tokio = { version = "1.46.1", features = ["full"] }
 tracing = { version = "0.1.41", features = ["log"] }
