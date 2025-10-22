@@ -7,3 +7,5 @@
 .DS_Store
 
 /target
+result
+nix/releases.json.bak
