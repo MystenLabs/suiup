@@ -1,8 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, Error};
 use crate::fs_utils::{read_json_file, write_json_file};
+use anyhow::{anyhow, Error};
 use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
