@@ -3,6 +3,7 @@
 
 pub mod commands;
 pub mod component;
+pub mod fs_utils;
 pub mod handle_commands;
 pub mod handlers;
 pub mod paths;

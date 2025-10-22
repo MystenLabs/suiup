@@ -2,14 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::collections::HashSet;
-use std::fs::File;
-use std::io::Write;
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
 use tracing::debug;
 
 use crate::commands::BinaryName;
+use crate::fs_utils::{read_json_file, write_json_file};
 use crate::paths::{default_file_path, get_default_bin_dir};
 use crate::types::InstalledBinaries;
 
@@ -42,12 +41,8 @@ pub async fn remove_component(binary: BinaryName) -> Result<()> {
 
     // Load default binaries
     let default_file = default_file_path()?;
-    let default = std::fs::read_to_string(&default_file)
-        .map_err(|_| anyhow!("Cannot read file {}", default_file.display()))?;
     let mut default_binaries: std::collections::BTreeMap<String, (String, String, bool)> =
-        serde_json::from_str(&default).map_err(|_| {
-            anyhow!("Cannot decode default binary file to JSON. Is the file corrupted?")
-        })?;
+        read_json_file(&default_file)?;
 
     // Remove the installed binaries
     for binary in &binaries_to_remove {
@@ -82,9 +77,7 @@ pub async fn remove_component(binary: BinaryName) -> Result<()> {
     }
 
     // Update default binaries file
-    File::create(&default_file)
-        .map_err(|_| anyhow!("Cannot create file: {}", default_file.display()))?
-        .write_all(serde_json::to_string_pretty(&default_binaries)?.as_bytes())?;
+    write_json_file(&default_file, &default_binaries)?;
 
     // Update installed binaries metadata
     installed_binaries.remove_binary(&binary.to_string());
