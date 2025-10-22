@@ -15,10 +15,14 @@ pub fn read_json_file<T: DeserializeOwned>(path: &Path) -> Result<T> {
 }
 
 pub fn write_json_file<T: Serialize>(path: &Path, data: &T) -> Result<()> {
-    let s = serde_json::to_string_pretty(data)
-        .map_err(|e| anyhow!("Cannot serialize data to write to file {}: {e}", path.display()))?;
-    let mut file = File::create(path)
-        .map_err(|e| anyhow!("Cannot create file {}: {e}", path.display()))?;
+    let s = serde_json::to_string_pretty(data).map_err(|e| {
+        anyhow!(
+            "Cannot serialize data to write to file {}: {e}",
+            path.display()
+        )
+    })?;
+    let mut file =
+        File::create(path).map_err(|e| anyhow!("Cannot create file {}: {e}", path.display()))?;
     file.write_all(s.as_bytes())
         .map_err(|e| anyhow!("Cannot write to {}: {e}", path.display()))?;
     Ok(())
