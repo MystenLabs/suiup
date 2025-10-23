@@ -145,6 +145,9 @@ mod tests {
     async fn test_cleanup_remove_old_files() -> Result<()> {
         let temp_dir = TempDir::new()?;
         // Set up environment variable for cache directory
+        #[cfg(windows)]
+        std::env::set_var("TEMP", temp_dir.path());
+        #[cfg(not(windows))]
         std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
         // Create cache directory
         let cache_dir = paths::release_archive_dir();
@@ -161,6 +164,9 @@ mod tests {
         let old_time = SystemTime::now() - Duration::from_secs(60 * 60 * 24 * 40); // 40 days ago
         filetime::set_file_mtime(&old_file, filetime::FileTime::from_system_time(old_time))?;
 
+        #[cfg(windows)]
+        std::env::set_var("TEMP", temp_dir.path());
+        #[cfg(not(windows))]
         std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
 
         // Actual cleanup should remove old file but keep new file
@@ -176,6 +182,9 @@ mod tests {
     async fn test_cleanup_remove_all() -> Result<()> {
         let temp_dir = TempDir::new()?;
         // Set up environment variable for cache directory
+        #[cfg(windows)]
+        std::env::set_var("TEMP", temp_dir.path());
+        #[cfg(not(windows))]
         std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
         // Create cache directory
         let cache_dir = paths::release_archive_dir();
@@ -188,6 +197,9 @@ mod tests {
         fs::write(&file1, b"content1")?;
         fs::write(&file2, b"content2")?;
 
+        #[cfg(windows)]
+        std::env::set_var("TEMP", temp_dir.path());
+        #[cfg(not(windows))]
         std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
 
         // Remove all should clear everything

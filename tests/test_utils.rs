@@ -74,11 +74,13 @@ impl TestEnv {
         // Store original env vars
         let vars_to_capture = vec![
             "LOCALAPPDATA",
+            "TEMP",
             "HOME",
             "XDG_DATA_HOME",
             "XDG_CONFIG_HOME",
             "XDG_CACHE_HOME",
             "PATH",
+            "SUIUP_DEFAULT_BIN_DIR",
         ];
 
         let original_env = vars_to_capture
@@ -89,12 +91,17 @@ impl TestEnv {
         // Set test env vars
         #[cfg(windows)]
         env::set_var("LOCALAPPDATA", &data_dir); // it is the same for data and config
+        #[cfg(windows)]
+        env::set_var("TEMP", &cache_dir);
         #[cfg(not(windows))]
         env::set_var("XDG_DATA_HOME", &data_dir);
         #[cfg(not(windows))]
         env::set_var("XDG_CONFIG_HOME", &config_dir);
         #[cfg(not(windows))]
         env::set_var("XDG_CACHE_HOME", &cache_dir);
+
+        // Set bin directory for all platforms
+        env::set_var("SUIUP_DEFAULT_BIN_DIR", &bin_dir);
 
         // Add bin dir to PATH
         let path = env::var("PATH").unwrap_or_default();
