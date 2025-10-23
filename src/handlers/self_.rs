@@ -96,7 +96,7 @@ impl Display for Ver {
     }
 }
 
-pub async fn handle_update() -> Result<()> {
+pub async fn handle_update(github_token: Option<String>) -> Result<()> {
     // find the current binary version
     let current_exe = std::env::current_exe()?;
     let current_version = Command::new(&current_exe).arg("--version").output()?.stdout;
@@ -121,13 +121,12 @@ pub async fn handle_update() -> Result<()> {
     // find the latest version on github in releases
     let repo = "https://api.github.com/repos/MystenLabs/suiup/releases/latest";
     let client = reqwest::Client::new();
-    let response = client
-        .get(repo)
-        .header("User-Agent", "suiup")
-        .send()
-        .await?
-        .json::<serde_json::Value>()
-        .await?;
+    let mut request = client.get(repo).header("User-Agent", "suiup");
+
+    if let Some(token) = &github_token {
+        request = request.header("Authorization", format!("token {}", token));
+    };
+    let response = request.send().await?.json::<serde_json::Value>().await?;
     let tag = response["tag_name"]
         .as_str()
         .ok_or_else(|| anyhow::anyhow!("Failed to parse latest version from GitHub response"))?;
@@ -150,7 +149,13 @@ pub async fn handle_update() -> Result<()> {
 
     let temp_dir = tempfile::tempdir()?;
     let archive_path = temp_dir.path().join(&archive_name);
-    download_file(&url, &temp_dir.path().join(archive_name), "suiup", None).await?;
+    download_file(
+        &url,
+        &temp_dir.path().join(archive_name),
+        "suiup",
+        github_token,
+    )
+    .await?;
 
     // extract the archive
     let file = File::open(archive_path.as_path())

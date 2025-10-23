@@ -4,9 +4,9 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::handle_commands::handle_cmd;
-
 use super::ComponentCommands;
+use crate::handle_commands::handle_cmd;
+use crate::handlers::config::ConfigHandler;
 
 /// Install a binary.
 #[derive(Args, Debug)]
@@ -29,16 +29,29 @@ pub struct Command {
     /// Accept defaults without prompting
     #[arg(short, long)]
     yes: bool,
+    /// Custom installation path for the binary
+    #[arg(long, value_name = "path")]
+    path: Option<String>,
 }
 
 impl Command {
     pub async fn exec(&self, github_token: &Option<String>) -> Result<()> {
+        let component = if self.component.contains('@') || self.component.contains('=') {
+            self.component.to_owned()
+        } else {
+            // If no version specified, use default network from config
+            let config_handler = ConfigHandler::new()?;
+            let config = config_handler.get_config();
+            format!("{}@{}", self.component, config.default_network)
+        };
+
         handle_cmd(
             ComponentCommands::Add {
-                component: self.component.to_owned(),
+                component,
                 nightly: self.nightly.to_owned(),
                 debug: self.debug.to_owned(),
                 yes: self.yes.to_owned(),
+                path: self.path.to_owned(),
             },
             github_token.to_owned(),
         )

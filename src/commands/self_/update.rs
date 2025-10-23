@@ -12,6 +12,15 @@ pub struct Command;
 
 impl Command {
     pub async fn exec(&self) -> Result<()> {
-        self_::handle_update().await
+        // Get GitHub token from config if available
+        let github_token = match crate::handlers::config::ConfigHandler::new() {
+            Ok(config_handler) => {
+                let config = config_handler.get_config();
+                config.github_token.clone()
+            }
+            Err(_) => None,
+        };
+
+        self_::handle_update(github_token).await
     }
 }

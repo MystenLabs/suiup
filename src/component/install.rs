@@ -5,6 +5,7 @@ use anyhow::{anyhow, Result};
 use std::fs::create_dir_all;
 
 use crate::commands::BinaryName;
+use crate::handlers::config::ConfigHandler;
 use crate::handlers::install::{install_from_nightly, install_from_release, install_standalone};
 use crate::paths::{binaries_dir, get_default_bin_dir};
 use crate::types::{Repo, Version};
@@ -17,11 +18,28 @@ pub async fn install_component(
     nightly: Option<String>,
     debug: bool,
     yes: bool,
+    path: Option<String>,
     github_token: Option<String>,
 ) -> Result<()> {
+    // Handle custom installation path - priority: command line arg > config file > default
+    let install_path = if let Some(custom_path) = path {
+        std::path::PathBuf::from(custom_path)
+    } else {
+        // Check config file for install_path setting
+        match ConfigHandler::new() {
+            Ok(config_handler) => {
+                let config = config_handler.get_config();
+                if let Some(ref config_path) = config.install_path {
+                    std::path::PathBuf::from(config_path)
+                } else {
+                    get_default_bin_dir()
+                }
+            }
+            Err(_) => get_default_bin_dir(), // Fallback to default if config can't be loaded
+        }
+    };
     // Ensure installation directories exist
-    let default_bin_dir = get_default_bin_dir();
-    create_dir_all(&default_bin_dir)?;
+    create_dir_all(&install_path)?;
 
     let installed_bins_dir = binaries_dir();
     create_dir_all(&installed_bins_dir)?;

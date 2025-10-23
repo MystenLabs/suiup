@@ -109,7 +109,7 @@ pub fn get_suiup_cache_dir() -> PathBuf {
     get_cache_home().join("suiup")
 }
 
-pub fn get_default_bin_dir() -> PathBuf {
+pub fn get_default_bin_dir_no_config() -> PathBuf {
     #[cfg(windows)]
     {
         let mut path = PathBuf::from(env::var_os("LOCALAPPDATA").expect("LOCALAPPDATA not set"));
@@ -133,8 +133,27 @@ pub fn get_default_bin_dir() -> PathBuf {
     }
 }
 
+/// Get the binary directory with configuration support
+pub fn get_default_bin_dir() -> PathBuf {
+    // Try to get install_path from config first
+    if let Ok(config_handler) = crate::handlers::config::ConfigHandler::new() {
+        let config = config_handler.get_config();
+        if let Some(ref install_path) = config.install_path {
+            return PathBuf::from(install_path);
+        }
+    }
+
+    // Fallback to default behavior
+    get_default_bin_dir_no_config()
+}
+
 pub fn get_config_file(name: &str) -> PathBuf {
     get_suiup_config_dir().join(name)
+}
+
+/// Returns the path to the configuration file
+pub fn config_file_path() -> Result<PathBuf, Error> {
+    Ok(get_config_file("config.json"))
 }
 
 /// Returns the path to the default version file
@@ -147,6 +166,20 @@ pub fn default_file_path() -> Result<PathBuf, Error> {
         file.write_all(default_str.as_bytes())?;
     }
     Ok(path)
+}
+
+/// Returns the path to the binaries folder with config support
+pub fn binaries_dir() -> PathBuf {
+    // Try to get install_path from config first
+    if let Ok(config_handler) = crate::handlers::config::ConfigHandler::new() {
+        let config = config_handler.get_config();
+        if let Some(ref install_path) = config.install_path {
+            return PathBuf::from(install_path).join("binaries");
+        }
+    }
+
+    // Fallback to default behavior
+    binaries_dir_no_config()
 }
 
 /// Returns the path to the installed binaries file
@@ -163,8 +196,8 @@ pub fn release_archive_dir() -> PathBuf {
     get_suiup_cache_dir().join(RELEASES_ARCHIVES_FOLDER)
 }
 
-/// Returns the path to the binaries folder
-pub fn binaries_dir() -> PathBuf {
+/// Returns the path to the binaries folder without config dependency
+pub fn binaries_dir_no_config() -> PathBuf {
     get_suiup_data_dir().join("binaries")
 }
 
