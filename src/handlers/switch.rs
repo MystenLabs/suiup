@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, bail, Result};
+use std::path::PathBuf;
 use tracing::info;
 
 use crate::{
@@ -123,10 +124,11 @@ fn get_binary_source_path(binary: &BinaryVersion) -> std::path::PathBuf {
 
     src.push(&binary_filename);
 
-    #[cfg(target_os = "windows")]
-    src.set_extension("exe");
-
-    src
+    if cfg!(target_os = "windows") {
+        PathBuf::from(format!("{}.exe", src.display()))
+    } else {
+        src
+    }
 }
 
 /// Construct the destination path for a binary
@@ -140,15 +142,21 @@ fn get_binary_destination_path(binary: &BinaryVersion) -> std::path::PathBuf {
 
     dst.push(&dst_name);
 
-    #[cfg(target_os = "windows")]
-    dst.set_extension("exe");
-
-    dst
+    if cfg!(target_os = "windows") {
+        PathBuf::from(format!("{}.exe", dst.display()))
+    } else {
+        dst
+    }
 }
 
 /// Copy binary file from source to destination
 fn copy_binary_file(src: &std::path::Path, dst: &std::path::Path, binary_name: &str) -> Result<()> {
     info!("Copying from {} to {}", src.display(), dst.display());
+
+    // Create parent directory if it doesn't exist
+    if let Some(parent) = dst.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
 
     // Remove existing file if it exists
     if dst.exists() {

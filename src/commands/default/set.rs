@@ -1,15 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, bail, Result};
-use clap::Args;
-use tracing::{debug, info};
-
 use crate::{
     commands::{parse_component_with_version, BinaryName, CommandMetadata},
     handlers::{installed_binaries_grouped_by_network, update_default_version_file},
     paths::{binaries_dir, get_default_bin_dir},
 };
+use anyhow::{anyhow, bail, Result};
+use clap::Args;
+use std::path::PathBuf;
+use tracing::{debug, info};
 
 #[cfg(not(windows))]
 use std::os::unix::fs::PermissionsExt;
@@ -115,7 +115,7 @@ impl Command {
         dst.push(&name);
 
         #[cfg(target_os = "windows")]
-        dst.set_extension("exe");
+        let dst = PathBuf::from(format!("{}.exe", dst.display()));
 
         let mut src = binaries_dir();
         src.push(network);
