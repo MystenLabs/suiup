@@ -31,7 +31,7 @@ tracing = { version = "0.1.41", features = ["log"] }
 whoami = "1.6.0"
 
 [dev-dependencies]
-assert_cmd = "2.0"
+assert_cmd = "2.1"
 mockall = "0.13.1"
 predicates = "3.1"
 
