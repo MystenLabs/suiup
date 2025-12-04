@@ -173,7 +173,7 @@ pub fn update_after_install(
                 );
 
                 let src = binary_folder.join(&filename);
-                let dst = get_default_bin_dir().join(binary);
+                let mut dst = get_default_bin_dir().join(binary);
 
                 println!("Setting {} as default", binary);
 
