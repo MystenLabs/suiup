@@ -126,7 +126,7 @@ fn get_binary_source_path(binary: &BinaryVersion) -> std::path::PathBuf {
     #[cfg(windows)]
     {
         if src.extension() != Some("exe".as_ref()) {
-            let new_src = format!("{}.exe", dst.display());
+            let new_src = format!("{}.exe", src.display());
             src.set_file_name(new_src);
         }
     }
