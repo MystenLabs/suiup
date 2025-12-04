@@ -88,7 +88,7 @@ pub fn update_after_install(
             binary.clone()
         };
 
-        let binary_path = if version == "nightly" {
+        let mut binary_path = if version == "nightly" {
             // cargo install places the binary in a `bin` folder
             binaries_dir()
                 .join(&network)
@@ -101,7 +101,12 @@ pub fn update_after_install(
         };
 
         #[cfg(windows)]
-        let binary_path = binary_path.with_extension("exe");
+        {
+            if binary_path.extension() != Some("exe".as_ref()) {
+                let new_binary_path = format!("{}.exe", binary_path.display());
+                binary_path.set_file_name(new_binary_path);
+            }
+        }
 
         if !binary_path.exists() {
             println!(
@@ -173,7 +178,12 @@ pub fn update_after_install(
                 println!("Setting {} as default", binary);
 
                 #[cfg(windows)]
-                dst.set_extension("exe");
+                {
+                    if dst.extension() != Some("exe".as_ref()) {
+                        let new_dst = format!("{}.exe", dst.display());
+                        dst.set_file_name(new_dst);
+                    }
+                }
 
                 tracing::debug!("Copying from {} to {}", src.display(), dst.display());
 
