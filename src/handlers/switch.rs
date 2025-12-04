@@ -123,8 +123,13 @@ fn get_binary_source_path(binary: &BinaryVersion) -> std::path::PathBuf {
 
     src.push(&binary_filename);
 
-    #[cfg(target_os = "windows")]
-    src.set_extension("exe");
+    #[cfg(windows)]
+    {
+        if src.extension() != Some("exe".as_ref()) {
+            let new_src = format!("{}.exe", src.display());
+            src.set_file_name(new_src);
+        }
+    }
 
     src
 }
@@ -140,8 +145,13 @@ fn get_binary_destination_path(binary: &BinaryVersion) -> std::path::PathBuf {
 
     dst.push(&dst_name);
 
-    #[cfg(target_os = "windows")]
-    dst.set_extension("exe");
+    #[cfg(windows)]
+    {
+        if dst.extension() != Some("exe".as_ref()) {
+            let new_dst = format!("{}.exe", dst.display());
+            dst.set_file_name(new_dst);
+        }
+    }
 
     dst
 }

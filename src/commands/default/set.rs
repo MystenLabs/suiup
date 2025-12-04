@@ -114,8 +114,13 @@ impl Command {
 
         dst.push(&name);
 
-        #[cfg(target_os = "windows")]
-        dst.set_extension("exe");
+        #[cfg(windows)]
+        {
+            if dst.extension() != Some("exe".as_ref()) {
+                let new_dst = format!("{}.exe", dst.display());
+                dst.set_file_name(new_dst);
+            }
+        }
 
         let mut src = binaries_dir();
         src.push(network);

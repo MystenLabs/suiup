@@ -147,9 +147,10 @@ pub async fn install_from_nightly(
     let dst = binaries_folder_branch.join("bin").join(dst_name);
 
     #[cfg(windows)]
-    let orig_binary_path = orig_binary_path.with_extension("exe");
+    let orig_binary_path = format!("{}.exe", orig_binary_path.display());
+
     #[cfg(windows)]
-    let dst = dst.with_extension("exe");
+    let dst = PathBuf::from(format!("{}.exe", dst.display()));
 
     std::fs::rename(&orig_binary_path, &dst)?;
     install_binary(

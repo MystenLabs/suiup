@@ -88,7 +88,7 @@ pub fn update_after_install(
             binary.clone()
         };
 
-        let binary_path = if version == "nightly" {
+        let mut binary_path = if version == "nightly" {
             // cargo install places the binary in a `bin` folder
             binaries_dir()
                 .join(&network)
@@ -100,8 +100,13 @@ pub fn update_after_install(
                 .join(format!("{}-{}", binary_name, version))
         };
 
-        #[cfg(target_os = "windows")]
-        let binary_path = binary_path.with_extension("exe");
+        #[cfg(windows)]
+        {
+            if binary_path.extension() != Some("exe".as_ref()) {
+                let new_binary_path = format!("{}.exe", binary_path.display());
+                binary_path.set_file_name(new_binary_path);
+            }
+        }
 
         if !binary_path.exists() {
             println!(
@@ -158,7 +163,7 @@ pub fn update_after_install(
                     })?;
                 }
 
-                #[cfg(target_os = "windows")]
+                #[cfg(windows)]
                 let filename = format!("{}.exe", filename);
 
                 println!(
@@ -168,14 +173,19 @@ pub fn update_after_install(
                 );
 
                 let src = binary_folder.join(&filename);
-                let dst = get_default_bin_dir().join(binary);
+                let mut dst = get_default_bin_dir().join(binary);
 
                 println!("Setting {} as default", binary);
 
-                #[cfg(target_os = "windows")]
-                let mut dst = dst.clone();
-                #[cfg(target_os = "windows")]
-                dst.set_extension("exe");
+                #[cfg(windows)]
+                {
+                    if dst.extension() != Some("exe".as_ref()) {
+                        let new_dst = format!("{}.exe", dst.display());
+                        dst.set_file_name(new_dst);
+                    }
+                }
+
+                tracing::debug!("Copying from {} to {}", src.display(), dst.display());
 
                 std::fs::copy(&src, &dst).map_err(|e| {
                     anyhow!(
