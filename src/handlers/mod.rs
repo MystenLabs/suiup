@@ -100,7 +100,7 @@ pub fn update_after_install(
                 .join(format!("{}-{}", binary_name, version))
         };
 
-        #[cfg(target_os = "windows")]
+        #[cfg(windows)]
         let binary_path = binary_path.with_extension("exe");
 
         if !binary_path.exists() {
@@ -158,7 +158,7 @@ pub fn update_after_install(
                     })?;
                 }
 
-                #[cfg(target_os = "windows")]
+                #[cfg(windows)]
                 let filename = format!("{}.exe", filename);
 
                 println!(
@@ -172,10 +172,10 @@ pub fn update_after_install(
 
                 println!("Setting {} as default", binary);
 
-                #[cfg(target_os = "windows")]
-                let mut dst = dst.clone();
-                #[cfg(target_os = "windows")]
+                #[cfg(windows)]
                 dst.set_extension("exe");
+
+                tracing::debug!("Copying from {} to {}", src.display(), dst.display());
 
                 std::fs::copy(&src, &dst).map_err(|e| {
                     anyhow!(
