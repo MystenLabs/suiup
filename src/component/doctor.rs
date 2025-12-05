@@ -95,16 +95,23 @@ fn check_path_variables(check: &mut impl FnMut(&str, Result<String, String>)) {
 
                 // Check PATH order
                 let cargo_bin_dir = dirs::home_dir().map(|p| p.join(".cargo/bin"));
-                if let Some(cargo_bin) = cargo_bin_dir {
-                    if paths.contains(&cargo_bin) {
-                        let suiup_pos = paths.iter().position(|p| p == &default_bin_dir);
-                        let cargo_pos = paths.iter().position(|p| p == &cargo_bin);
-                        if let (Some(s_pos), Some(c_pos)) = (suiup_pos, cargo_pos) {
-                            if s_pos > c_pos {
-                                check("PATH order", Err(format!("WARN: Default binary directory ({}) is after cargo's binary directory ({}). This may cause conflicts if you have also installed sui via `cargo install`.", default_bin_dir.display(), cargo_bin.display())));
-                            } else {
-                                check("PATH order", Ok("is correct".to_string()));
-                            }
+                if let Some(cargo_bin) = cargo_bin_dir
+                    && paths.contains(&cargo_bin)
+                {
+                    let suiup_pos = paths.iter().position(|p| p == &default_bin_dir);
+                    let cargo_pos = paths.iter().position(|p| p == &cargo_bin);
+                    if let (Some(s_pos), Some(c_pos)) = (suiup_pos, cargo_pos) {
+                        if s_pos > c_pos {
+                            check(
+                                "PATH order",
+                                Err(format!(
+                                    "WARN: Default binary directory ({}) is after cargo's binary directory ({}). This may cause conflicts if you have also installed sui via `cargo install`.",
+                                    default_bin_dir.display(),
+                                    cargo_bin.display()
+                                )),
+                            );
+                        } else {
+                            check("PATH order", Ok("is correct".to_string()));
                         }
                     }
                 }
@@ -307,9 +314,11 @@ mod tests {
         println!("Path exists: {}", path.exists());
         let result = check_suiup_data_dir();
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .contains("suiup data directory not found"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("suiup data directory not found")
+        );
 
         // Restore original env var
         #[cfg(windows)]
