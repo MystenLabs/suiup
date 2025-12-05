@@ -12,7 +12,7 @@ use std::process::Command;
 
 pub async fn run_doctor_checks() -> Result<()> {
     println!("\n{}", "Suiup Environment Doctor".bold());
-    println!("{}", "------------------------");
+    println!("------------------------");
 
     let mut warnings = 0;
     let mut errors = 0;

@@ -88,7 +88,7 @@ pub fn update_after_install(
             binary.clone()
         };
 
-        let mut binary_path = if version == "nightly" {
+        let binary_path = if version == "nightly" {
             // cargo install places the binary in a `bin` folder
             binaries_dir()
                 .join(&network)
@@ -100,6 +100,8 @@ pub fn update_after_install(
                 .join(format!("{}-{}", binary_name, version))
         };
 
+        #[cfg(windows)]
+        let mut binary_path = binary_path.clone();
         #[cfg(windows)]
         {
             if binary_path.extension() != Some("exe".as_ref()) {
@@ -173,10 +175,12 @@ pub fn update_after_install(
                 );
 
                 let src = binary_folder.join(&filename);
-                let mut dst = get_default_bin_dir().join(binary);
+                let dst = get_default_bin_dir().join(binary);
 
                 println!("Setting {} as default", binary);
 
+                #[cfg(windows)]
+                let mut dst = dst.clone();
                 #[cfg(windows)]
                 {
                     if dst.extension() != Some("exe".as_ref()) {

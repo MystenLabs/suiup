@@ -4,7 +4,7 @@
 use crate::{
     handlers::installed_binaries_grouped_by_network,
     paths::default_file_path,
-    types::{Binaries, Version},
+    types::{Binaries, BinaryVersion, Version},
 };
 use anyhow::Error;
 use std::collections::BTreeMap;
@@ -19,7 +19,7 @@ fn load_default_binaries() -> Result<Binaries, Error> {
 }
 
 /// Load installed binaries grouped by network
-fn load_installed_binaries() -> Result<Vec<crate::types::BinaryVersion>, Error> {
+fn load_installed_binaries() -> Result<Vec<BinaryVersion>, Error> {
     let installed_binaries = installed_binaries_grouped_by_network(None)?;
     let binaries = installed_binaries
         .into_iter()
@@ -29,7 +29,7 @@ fn load_installed_binaries() -> Result<Vec<crate::types::BinaryVersion>, Error> 
 }
 
 /// Display a section with title and binaries table
-fn display_binaries_section(title: &str, binaries: &Vec<crate::types::BinaryVersion>) {
+fn display_binaries_section(title: &str, binaries: &[BinaryVersion]) {
     println!("\x1b[1m{}:\x1b[0m", title);
     print_table(binaries);
 }
