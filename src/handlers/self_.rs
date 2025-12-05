@@ -12,6 +12,7 @@ use flate2::read::GzDecoder;
 use serde::Deserialize;
 use std::fs::File;
 use tar::Archive;
+use zip::ZipArchive;
 
 #[derive(Debug, Deserialize)]
 struct GitHubRelease {
@@ -150,16 +151,41 @@ pub async fn handle_update() -> Result<()> {
 
     let temp_dir = tempfile::tempdir()?;
     let archive_path = temp_dir.path().join(&archive_name);
-    download_file(&url, &temp_dir.path().join(archive_name), "suiup", None).await?;
+    download_file(&url, &temp_dir.path().join(&archive_name), "suiup", None).await?;
 
-    // extract the archive
-    let file = File::open(archive_path.as_path())
-        .map_err(|_| anyhow!("Cannot open archive file: {}", archive_path.display()))?;
-    let tar = GzDecoder::new(file);
-    let mut archive = Archive::new(tar);
-    archive
-        .unpack(temp_dir.path())
-        .map_err(|_| anyhow!("Cannot unpack archive file: {}", archive_path.display()))?;
+    // extract the archive based on file extension
+    if archive_name.ends_with(".zip") {
+        // Handle ZIP extraction
+        let file = File::open(archive_path.as_path())
+            .map_err(|_| anyhow!("Cannot open archive file: {}", archive_path.display()))?;
+        let mut archive = ZipArchive::new(file)
+            .map_err(|_| anyhow!("Cannot read zip archive: {}", archive_path.display()))?;
+
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i)
+                .map_err(|_| anyhow!("Cannot read file from zip archive"))?;
+            let outpath = temp_dir.path().join(file.name());
+
+            if file.is_dir() {
+                std::fs::create_dir_all(&outpath)?;
+            } else {
+                if let Some(parent) = outpath.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                let mut outfile = File::create(&outpath)?;
+                std::io::copy(&mut file, &mut outfile)?;
+            }
+        }
+    } else {
+        // Handle tar.gz extraction
+        let file = File::open(archive_path.as_path())
+            .map_err(|_| anyhow!("Cannot open archive file: {}", archive_path.display()))?;
+        let tar = GzDecoder::new(file);
+        let mut archive = Archive::new(tar);
+        archive
+            .unpack(temp_dir.path())
+            .map_err(|_| anyhow!("Cannot unpack archive file: {}", archive_path.display()))?;
+    }
 
     #[cfg(not(windows))]
     let binary = "suiup";
