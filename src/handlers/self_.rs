@@ -12,7 +12,6 @@ use flate2::read::GzDecoder;
 use serde::Deserialize;
 use std::fs::File;
 use tar::Archive;
-use zip::ZipArchive;
 
 #[derive(Debug, Deserialize)]
 struct GitHubRelease {
@@ -151,28 +150,16 @@ pub async fn handle_update() -> Result<()> {
 
     let temp_dir = tempfile::tempdir()?;
     let archive_path = temp_dir.path().join(&archive_name);
-    download_file(&url, &temp_dir.path().join(&archive_name), "suiup", None).await?;
+    download_file(&url, &temp_dir.path().join(archive_name), "suiup", None).await?;
 
     // extract the archive
-    if archive_name.ends_with(".zip") {
-        // Handle zip extraction (Windows)
-        let file = File::open(archive_path.as_path())
-            .map_err(|_| anyhow!("Cannot open archive file: {}", archive_path.display()))?;
-        let mut archive = ZipArchive::new(file)
-            .map_err(|_| anyhow!("Cannot read zip archive: {}", archive_path.display()))?;
-        archive
-            .extract(temp_dir.path())
-            .map_err(|_| anyhow!("Cannot unpack zip archive: {}", archive_path.display()))?;
-    } else {
-        // Handle tar.gz extraction (Unix/macOS)
-        let file = File::open(archive_path.as_path())
-            .map_err(|_| anyhow!("Cannot open archive file: {}", archive_path.display()))?;
-        let tar = GzDecoder::new(file);
-        let mut archive = Archive::new(tar);
-        archive
-            .unpack(temp_dir.path())
-            .map_err(|_| anyhow!("Cannot unpack tar.gz archive: {}", archive_path.display()))?;
-    }
+    let file = File::open(archive_path.as_path())
+        .map_err(|_| anyhow!("Cannot open archive file: {}", archive_path.display()))?;
+    let tar = GzDecoder::new(file);
+    let mut archive = Archive::new(tar);
+    archive
+        .unpack(temp_dir.path())
+        .map_err(|_| anyhow!("Cannot unpack archive file: {}", archive_path.display()))?;
 
     #[cfg(not(windows))]
     let binary = "suiup";
