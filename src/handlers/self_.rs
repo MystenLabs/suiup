@@ -203,11 +203,10 @@ fn find_archive_name() -> Result<String> {
         _ => &arch,
     };
 
-    let filename = if os == "Windows" && arch == "arm64" {
-        "suiup-Windows-msvc-arm64.zip".to_string()
-    } else {
-        format!("suiup-{os}-{arch}.tar.gz")
-    };
+    #[cfg(not(target_os = "windows"))]
+    let filename = format!("suiup-{os}-{arch}.tar.gz");
+    #[cfg(target_os = "windows")]
+    let filename = format!("suiup-{os}-msvc-{arch}.zip");
 
     Ok(filename)
 }
