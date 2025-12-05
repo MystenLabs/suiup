@@ -9,3 +9,4 @@ pub mod handlers;
 pub mod paths;
 pub mod standalone;
 pub mod types;
+pub mod validation;
