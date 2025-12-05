@@ -35,7 +35,7 @@ pub async fn handle_cleanup(all: bool, days: u32, dry_run: bool) -> Result<()> {
                 fs::remove_dir_all(&release_archive_dir)?;
                 fs::create_dir_all(&release_archive_dir)?;
             }
-            println!("{}", "Cache cleared successfully.");
+            println!("Cache cleared successfully.");
         }
         return Ok(());
     }
@@ -100,8 +100,7 @@ pub async fn handle_cleanup(all: bool, days: u32, dry_run: bool) -> Result<()> {
         );
     } else {
         println!(
-            "{} {} files removed, {} freed",
-            "Cleanup complete.",
+            "Cleanup complete. {} files removed, {} freed",
             files_removed,
             format_file_size(cleaned_size)
         );

@@ -254,8 +254,8 @@ pub fn parse_version_spec(spec: Option<String>) -> Result<(String, Option<String
     }
 }
 
-pub fn print_table(binaries: &Vec<BinaryVersion>) {
-    let mut binaries_vec = binaries.clone();
+pub fn print_table(binaries: &[BinaryVersion]) {
+    let mut binaries_vec = binaries.to_owned();
     // sort by Binary column
     binaries_vec.sort_by_key(|b| b.binary_name.clone());
     let mut table = Table::new();

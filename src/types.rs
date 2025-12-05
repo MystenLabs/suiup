@@ -6,7 +6,7 @@ use anyhow::{anyhow, Error};
 use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
-    path::PathBuf,
+    path::Path,
     str::FromStr,
 };
 
@@ -102,7 +102,7 @@ pub enum Network {
 }
 
 impl InstalledBinaries {
-    pub fn create_file(path: &PathBuf) -> Result<(), Error> {
+    pub fn create_file(path: &Path) -> Result<(), Error> {
         let binaries = InstalledBinaries { binaries: vec![] };
         write_json_file(path, &binaries)
     }

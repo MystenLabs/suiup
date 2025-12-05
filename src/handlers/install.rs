@@ -173,7 +173,7 @@ pub async fn install_standalone(
     let network = "standalone".to_string();
     let binary_name = repo.binary_name();
     if !check_if_binaries_exist(
-        &binary_name,
+        binary_name,
         network.clone(),
         &version.clone().unwrap_or_default(),
     )? {
@@ -186,7 +186,7 @@ pub async fn install_standalone(
             .join(&network)
             .join(format!("{}-{}", binary_name, installed_version));
         install_binary(
-            &binary_name,
+            binary_name,
             network,
             &installed_version,
             false,
