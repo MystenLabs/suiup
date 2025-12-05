@@ -4,7 +4,7 @@
 use super::download::detect_os_arch;
 
 use crate::handlers::download::download_file;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::{fmt::Display, process::Command};
 use tokio::task;
 

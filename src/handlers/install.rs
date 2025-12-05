@@ -12,9 +12,9 @@ use crate::handlers::{extract_component, update_after_install};
 use crate::paths::binaries_dir;
 use crate::standalone;
 use crate::types::{BinaryVersion, InstalledBinaries, Repo};
+use anyhow::Error;
 use anyhow::anyhow;
 use anyhow::bail;
-use anyhow::Error;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::time::Duration;
 
@@ -74,7 +74,9 @@ pub async fn install_from_release(
         let binary_path = binaries_dir().join(network).join(binary_filename);
         install_binary(name, network.to_string(), &version, debug, binary_path, yes)?;
     } else {
-        println!("Binary {name}-{version} already installed. Use `suiup default set` to change the default binary.");
+        println!(
+            "Binary {name}-{version} already installed. Use `suiup default set` to change the default binary."
+        );
     }
     Ok(())
 }
@@ -195,7 +197,9 @@ pub async fn install_standalone(
         )?;
     } else {
         let version = version.unwrap_or_default();
-        println!("Binary {binary_name}-{version} already installed. Use `suiup default set {binary_name} {version}` to set the default version to the specified one.");
+        println!(
+            "Binary {binary_name}-{version} already installed. Use `suiup default set {binary_name} {version}` to set the default version to the specified one."
+        );
     }
 
     Ok(())

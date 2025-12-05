@@ -9,7 +9,7 @@ mod remove;
 use anyhow::Result;
 
 use crate::commands::{
-    parse_component_with_version, BinaryName, CommandMetadata, ComponentCommands,
+    BinaryName, CommandMetadata, ComponentCommands, parse_component_with_version,
 };
 
 /// ComponentManager handles all component-related operations

@@ -4,7 +4,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use tracing::debug;
 
 use crate::commands::BinaryName;
@@ -31,11 +31,11 @@ pub async fn remove_component(binary: BinaryName) -> Result<()> {
 
     // Verify all binaries exist before removing any
     for p in &binaries_to_remove {
-        if let Some(p) = p.path.as_ref() {
-            if !PathBuf::from(p).exists() {
-                println!("Binary {p} does not exist. Aborting the command.");
-                return Ok(());
-            }
+        if let Some(p) = p.path.as_ref()
+            && !PathBuf::from(p).exists()
+        {
+            println!("Binary {p} does not exist. Aborting the command.");
+            return Ok(());
         }
     }
 

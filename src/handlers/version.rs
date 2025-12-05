@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, Error};
+use anyhow::{Error, anyhow};
 use lazy_static::lazy_static;
 
 lazy_static! {

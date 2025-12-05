@@ -7,13 +7,13 @@ use crate::handlers::release::{
 use crate::handlers::version::extract_version_from_release;
 use crate::types::Repo;
 use crate::{handlers::release::release_list, paths::release_archive_dir, types::Release};
-use anyhow::{anyhow, bail, Error};
+use anyhow::{Error, anyhow, bail};
 use futures_util::StreamExt;
 use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
 use md5::Context;
 use reqwest::{
-    header::{HeaderMap, HeaderValue, USER_AGENT},
     Client,
+    header::{HeaderMap, HeaderValue, USER_AGENT},
 };
 use std::fs::File;
 use std::io::Read;
@@ -204,10 +204,10 @@ pub async fn download_file(
     let mut request = client.get(url).header("User-Agent", "suiup");
 
     // Add authorization header if token is provided and the URL is from GitHub
-    if let Some(token) = github_token {
-        if url.contains("github.com") {
-            request = request.header("Authorization", format!("token {}", token));
-        }
+    if let Some(token) = github_token
+        && url.contains("github.com")
+    {
+        request = request.header("Authorization", format!("token {}", token));
     }
 
     let response = request.send().await?;

@@ -1,8 +1,8 @@
 [package]
 name = "suiup"
 description = "Sui Tooling Version Manager."
-version = "0.0.5"
-edition = "2021"
+version = "0.0.6"
+edition = "2024"
 
 [dependencies]
 anyhow = "1.0.98"

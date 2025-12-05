@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::fs::create_dir_all;
 
 use crate::commands::BinaryName;
@@ -81,7 +81,7 @@ pub async fn install_component(
                     match name {
                         BinaryName::Mvr => Repo::Mvr,
                         _ => {
-                            return Err(anyhow!("Invalid binary name for standalone installation"))
+                            return Err(anyhow!("Invalid binary name for standalone installation"));
                         }
                     },
                     yes,
