@@ -359,11 +359,16 @@ pub fn check_if_binaries_exist(
         format!("{}-{}", binary, version)
     };
 
-    #[cfg(target_os = "windows")]
-    {
+    // Build the final expected binary path (Windows binaries have .exe extension).
+    // Previous logic incorrectly pushed both the `.exe` file name AND the plain name as an
+    // additional path component on Windows, resulting in a non-existent path like:
+    //   <...>/binaries/<network>/binary.exe/binary-version
+    // This prevented proper detection of already installed binaries.
+    if cfg!(target_os = "windows") {
         path.push(format!("{}.exe", binary_version));
+    } else {
+        path.push(&binary_version);
     }
-    path.push(&binary_version);
     Ok(path.exists())
 }
 
@@ -388,4 +393,93 @@ pub fn installed_binaries_grouped_by_network(
     }
 
     Ok(files_by_folder)
+}
+
+// --- Tests -----------------------------------------------------------------
+// Internal helper (exposed for tests inside this module) to build the final path; this
+// lets us unit test both Windows and non-Windows logic irrespective of the host platform.
+#[cfg(test)]
+fn build_binary_path(
+    mut base: std::path::PathBuf,
+    binary_version: &str,
+    is_windows: bool,
+) -> std::path::PathBuf {
+    if is_windows {
+        base.push(format!("{}.exe", binary_version));
+    } else {
+        base.push(binary_version);
+    }
+    base
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{build_binary_path, check_if_binaries_exist};
+    use crate::paths::binaries_dir;
+    use std::fs::{self, File};
+    use std::io::Write;
+    use std::path::PathBuf;
+
+    // Validate helper path construction for both Windows & non-Windows cases.
+    #[test]
+    fn test_build_binary_path() {
+        let base_unix = PathBuf::from("/tmp/suiup/binaries/testnet");
+        let p_unix = build_binary_path(base_unix.clone(), "sui-v1.0.0", false);
+        assert!(
+            p_unix
+                .to_string_lossy()
+                .ends_with("/tmp/suiup/binaries/testnet/sui-v1.0.0")
+                || p_unix
+                    .to_string_lossy()
+                    .ends_with("\\tmp\\suiup\\binaries\\testnet\\sui-v1.0.0")
+        );
+        assert!(!p_unix.to_string_lossy().ends_with(".exe"));
+
+        let base_win = PathBuf::from("C:/suiup/binaries/testnet");
+        let p_win = build_binary_path(base_win.clone(), "sui-v1.0.0", true);
+        assert!(
+            p_win.to_string_lossy().ends_with("sui-v1.0.0.exe"),
+            "Windows path should end with .exe: {p_win:?}"
+        );
+        // Ensure we did not append an extra plain (non-.exe) component.
+        let components: Vec<_> = p_win.components().collect();
+        let last = components.last().unwrap().as_os_str().to_string_lossy();
+        assert_eq!(last, "sui-v1.0.0.exe");
+    }
+
+    // Functional test (host-platform specific) verifying existence detection works.
+    #[test]
+    fn test_check_if_binaries_exist_detects_created_file() {
+        // Use a temp dir and point XDG/LOCALAPPDATA to it so binaries_dir() resolves inside it.
+        let temp = tempfile::TempDir::new().unwrap();
+        #[cfg(windows)]
+        let (var, original) = ("LOCALAPPDATA", std::env::var("LOCALAPPDATA").ok());
+        #[cfg(not(windows))]
+        let (var, original) = ("XDG_DATA_HOME", std::env::var("XDG_DATA_HOME").ok());
+        std::env::set_var(var, temp.path());
+
+        let mut network_dir = binaries_dir();
+        network_dir.push("testnet");
+        fs::create_dir_all(&network_dir).unwrap();
+
+        let binary_version = "sui-v1.2.3";
+        let mut file_path = network_dir.clone();
+        if cfg!(windows) {
+            file_path.push(format!("{}.exe", binary_version));
+        } else {
+            file_path.push(binary_version);
+        }
+        let mut f = File::create(&file_path).unwrap();
+        writeln!(f, "test").unwrap();
+
+        let exists = check_if_binaries_exist("sui", "testnet".to_string(), "v1.2.3").unwrap();
+        assert!(exists, "Binary should be detected as existing");
+
+        // Restore original environment variable (best effort).
+        if let Some(val) = original {
+            std::env::set_var(var, val);
+        } else {
+            std::env::remove_var(var);
+        }
+    }
 }
