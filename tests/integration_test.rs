@@ -526,10 +526,15 @@ mod tests {
     async fn test_cleanup_command_help() -> Result<()> {
         let test_env = TestEnv::new()?;
 
+        let text = if cfg!(windows) {
+            "Usage: suiup.exe cleanup"
+        } else {
+            "Usage: suiup cleanup"
+        };
         let mut cmd = suiup_command(vec!["cleanup", "--help"], &test_env);
         cmd.assert()
             .success()
-            .stdout(predicate::str::contains("Usage: suiup cleanup"))
+            .stdout(predicate::str::contains(text))
             .stdout(predicate::str::contains("--all"))
             .stdout(predicate::str::contains("--days"))
             .stdout(predicate::str::contains("--dry-run"))
