@@ -1,8 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, Result};
-use serde::{de::DeserializeOwned, Serialize};
+use anyhow::{Result, anyhow};
+use serde::{Serialize, de::DeserializeOwned};
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;

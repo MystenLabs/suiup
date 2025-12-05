@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    commands::{parse_component_with_version, BinaryName, CommandMetadata, ComponentCommands},
+    commands::{BinaryName, CommandMetadata, ComponentCommands, parse_component_with_version},
     handle_commands::handle_cmd,
     types::InstalledBinaries,
 };
@@ -13,7 +13,7 @@ use crate::{
     },
     types::Repo,
 };
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 
 /// Handles the `update` command
 pub async fn handle_update(
@@ -38,7 +38,9 @@ pub async fn handle_update(
     let installed_binaries = InstalledBinaries::new()?;
     let binaries = installed_binaries.binaries();
     if !binaries.iter().any(|x| x.binary_name == name.to_str()) {
-        bail!("Binary {name} not found in installed binaries. Use `suiup show` to see installed binaries and `suiup install` to install the binary.")
+        bail!(
+            "Binary {name} not found in installed binaries. Use `suiup show` to see installed binaries and `suiup install` to install the binary."
+        )
     }
     let binaries_by_network = installed_binaries_grouped_by_network(Some(installed_binaries))?;
 

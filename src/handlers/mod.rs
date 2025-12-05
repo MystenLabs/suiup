@@ -3,8 +3,8 @@
 
 use crate::paths::{binaries_dir, get_default_bin_dir, release_archive_dir};
 use crate::{paths::default_file_path, types::Version};
-use anyhow::anyhow;
 use anyhow::Error;
+use anyhow::anyhow;
 use flate2::read::GzDecoder;
 use std::env;
 use std::io::Write;

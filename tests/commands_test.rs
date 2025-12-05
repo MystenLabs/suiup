@@ -6,7 +6,7 @@ mod tests {
     use anyhow::Result;
     use std::fs;
     use std::time::{Duration, SystemTime};
-    use suiup::commands::{parse_component_with_version, BinaryName, CommandMetadata};
+    use suiup::commands::{BinaryName, CommandMetadata, parse_component_with_version};
     use suiup::handlers::cleanup::handle_cleanup;
     use suiup::handlers::switch::parse_binary_spec;
     use suiup::paths;
@@ -82,17 +82,21 @@ mod tests {
 
         let result = parse_binary_spec("sui@");
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Binary name and network/release cannot be empty"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Binary name and network/release cannot be empty")
+        );
 
         let result = parse_binary_spec("@testnet");
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Binary name and network/release cannot be empty"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Binary name and network/release cannot be empty")
+        );
 
         let result = parse_binary_spec("sui@testnet@extra");
         assert!(result.is_err());

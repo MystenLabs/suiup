@@ -15,7 +15,7 @@ mod which;
 
 use crate::{handlers::self_::check_for_updates, types::BinaryVersion};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use clap::{Parser, Subcommand, ValueEnum};
 use comfy_table::Table;
 pub const TABLE_FORMAT: &str = "  ── ══      ──    ";

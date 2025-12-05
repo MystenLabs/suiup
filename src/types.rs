@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::fs_utils::{read_json_file, write_json_file};
-use anyhow::{anyhow, Error};
+use anyhow::{Error, anyhow};
 use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
