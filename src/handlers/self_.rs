@@ -162,7 +162,8 @@ pub async fn handle_update() -> Result<()> {
             .map_err(|_| anyhow!("Cannot read zip archive: {}", archive_path.display()))?;
 
         for i in 0..archive.len() {
-            let mut file = archive.by_index(i)
+            let mut file = archive
+                .by_index(i)
                 .map_err(|_| anyhow!("Cannot read file from zip archive"))?;
             let outpath = temp_dir.path().join(file.name());
 
