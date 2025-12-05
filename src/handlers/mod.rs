@@ -324,7 +324,7 @@ fn extract_component(orig_binary: &str, network: String, filename: &str) -> Resu
             {
                 // Retrieve and apply the original file permissions on Unix-like systems
                 if let Ok(permissions) = f.header().mode() {
-                    set_permissions(output_path, PermissionsExt::from_mode(permissions)).map_err(
+                    set_permissions(&output_path, PermissionsExt::from_mode(permissions)).map_err(
                         |e| {
                             anyhow!(
                                 "Cannot apply the original file permissions in a unix system: {e}"
@@ -333,6 +333,16 @@ fn extract_component(orig_binary: &str, network: String, filename: &str) -> Resu
                     )?;
                 }
             }
+
+            // Apply patchelf if the feature is enabled
+            #[cfg(feature = "nix-patchelf")]
+            {
+                if let Err(e) = crate::patchelf::patch_binary(&output_path) {
+                    println!("Warning: Failed to patch binary with patchelf: {}", e);
+                    println!("The binary may not work correctly. Ensure nix-runtime-deps.json is installed.");
+                }
+            }
+
             break;
         }
     }

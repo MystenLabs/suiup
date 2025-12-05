@@ -9,3 +9,6 @@ pub mod handlers;
 pub mod paths;
 pub mod standalone;
 pub mod types;
+
+#[cfg(feature = "nix-patchelf")]
+pub mod patchelf;

@@ -6,6 +6,8 @@ mod default;
 mod doctor;
 mod install;
 mod list;
+#[cfg(feature = "nix-patchelf")]
+mod patch;
 mod remove;
 mod self_;
 mod show;
@@ -51,6 +53,8 @@ pub enum Commands {
     Update(update::Command),
     Which(which::Command),
     Cleanup(cleanup::Command),
+    #[cfg(feature = "nix-patchelf")]
+    Patch(patch::Command),
 }
 
 impl Command {
@@ -72,6 +76,8 @@ impl Command {
             Commands::Update(cmd) => cmd.exec(&self.github_token).await,
             Commands::Which(cmd) => cmd.exec(),
             Commands::Cleanup(cmd) => cmd.exec(&self.github_token).await,
+            #[cfg(feature = "nix-patchelf")]
+            Commands::Patch(cmd) => cmd.exec(),
         }
     }
 }

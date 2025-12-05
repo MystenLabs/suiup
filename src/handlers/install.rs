@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::path::PathBuf;
+use std::path::Path;
 use std::process::{Command, Stdio};
 
 use super::check_if_binaries_exist;
@@ -23,7 +23,7 @@ pub fn install_binary(
     network: String,
     version: &str,
     debug: bool,
-    binary_path: PathBuf,
+    binary_path: &Path,
     yes: bool,
 ) -> Result<(), Error> {
     let mut installed_binaries = InstalledBinaries::new()?;
@@ -72,7 +72,14 @@ pub async fn install_from_release(
         let binary_filename = format!("{}.exe", binary_filename);
 
         let binary_path = binaries_dir().join(network).join(binary_filename);
-        install_binary(name, network.to_string(), &version, debug, binary_path, yes)?;
+        install_binary(
+            name,
+            network.to_string(),
+            &version,
+            debug,
+            &binary_path,
+            yes,
+        )?;
     } else {
         println!("Binary {name}-{version} already installed. Use `suiup default set` to change the default binary.");
     }
@@ -158,7 +165,7 @@ pub async fn install_from_nightly(
         branch.to_string(),
         "nightly",
         debug,
-        dst,
+        &dst,
         yes,
     )?;
 
@@ -185,12 +192,21 @@ pub async fn install_standalone(
         let binary_path = binaries_dir()
             .join(&network)
             .join(format!("{}-{}", binary_name, installed_version));
+        #[cfg(feature = "nix-patchelf")]
+        {
+            if let Err(e) = crate::patchelf::patch_binary(&binary_path) {
+                println!("Warning: Failed to patch binary with patchelf: {}", e);
+                println!(
+                    "The binary may not work correctly. Ensure nix-runtime-deps.json is installed."
+                );
+            }
+        }
         install_binary(
             &binary_name,
             network,
             &installed_version,
             false,
-            binary_path,
+            &binary_path,
             yes,
         )?;
     } else {

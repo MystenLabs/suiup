@@ -1,0 +1,50 @@
+{
+  "mvr": {
+    "v0.0.14": {
+      "hash": "sha256-qOmBBUCMp6hkhqFULoELT7Zn8SS4x6kD+YIt4WpvZJQ=",
+      "url": "https://github.com/MystenLabs/mvr/releases/download/v0.0.14/mvr-ubuntu-x86_64"
+    },
+    "v0.0.13": {
+      "hash": "sha256-v+nIHxu6l0RYlJaDApMV33OjxX97zAe94EYEzgnqBlw=",
+      "url": "https://github.com/MystenLabs/mvr/releases/download/v0.0.13/mvr-ubuntu-x86_64"
+    },
+    "v0.0.12": {
+      "hash": "sha256-wX12NzDGoKOoNfGBdIX9MJSnlmqbfBfyBWJJZoaRpTI=",
+      "url": "https://github.com/MystenLabs/mvr/releases/download/v0.0.12/mvr-ubuntu-x86_64"
+    }
+  },
+  "sui": {
+    "testnet-v1.59.0": {
+      "hash": "sha256-fAsPS5ZuuM3EB5wRpIk3t/va3t77/KhpaVJC2iR2mAc=",
+      "url": "https://github.com/MystenLabs/sui/releases/download/testnet-v1.59.0/sui-testnet-v1.59.0-ubuntu-x86_64.tgz"
+    },
+    "devnet-v1.59.0": {
+      "hash": "sha256-fAsPS5ZuuM3EB5wRpIk3t/va3t77/KhpaVJC2iR2mAc=",
+      "url": "https://github.com/MystenLabs/sui/releases/download/devnet-v1.59.0/sui-devnet-v1.59.0-ubuntu-x86_64.tgz"
+    },
+    "mainnet-v1.58.3": {
+      "hash": "sha256-FzexVaaaB8SqgzczPxiziFaf2xVI5Ovc+iuLdck0APA=",
+      "url": "https://github.com/MystenLabs/sui/releases/download/mainnet-v1.58.3/sui-mainnet-v1.58.3-ubuntu-x86_64.tgz"
+    }
+  },
+  "walrus": {
+    "testnet-v1.35.0": {
+      "hash": "sha256-/nI+o9RL9ellBLjGtA7EcpWVNQYLJnq4aNJ7puJGrGw=",
+      "url": "https://github.com/MystenLabs/walrus/releases/download/testnet-v1.35.0/walrus-testnet-v1.35.0-ubuntu-x86_64.tgz"
+    },
+    "mainnet-v1.34.2": {
+      "hash": "sha256-W+xE/zinHPnUND8Ag/SOW/QzGxJbGtKR0+Mg3XIKg3U=",
+      "url": "https://github.com/MystenLabs/walrus/releases/download/mainnet-v1.34.2/walrus-mainnet-v1.34.2-ubuntu-x86_64.tgz"
+    },
+    "devnet-v1.34.0": {
+      "hash": "sha256-bIA7a7VgKpnsur38KIAfA8+Ny+Tx1UR9qAxgy5sMBzU=",
+      "url": "https://github.com/MystenLabs/walrus/releases/download/devnet-v1.34.0/walrus-devnet-v1.34.0-ubuntu-x86_64.tgz"
+    }
+  },
+  "walrus-sites": {
+    "mainnet-v1.3.0": {
+      "hash": "sha256-4opJhaTqbJBVmWpkQKJxD2M0CWg1TfifIQF3Yh1dSpo=",
+      "url": "https://github.com/MystenLabs/walrus-sites/releases/download/mainnet-v1.3.0/site-builder-mainnet-v1.3.0-ubuntu-x86_64.tgz"
+    }
+  }
+}
