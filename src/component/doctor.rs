@@ -246,6 +246,8 @@ async fn check_network_connectivity(check: &mut impl FnMut(&str, Result<String, 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::remove_env_var;
+    use crate::set_env_var;
     use std::fs;
     use tempfile::TempDir;
 
@@ -260,12 +262,12 @@ mod tests {
         #[cfg(windows)]
         {
             original_data_home = std::env::var("LOCALAPPDATA");
-            std::env::set_var("LOCALAPPDATA", data_dir.to_str().unwrap());
+            set_env_var!("LOCALAPPDATA", data_dir.to_str().unwrap());
         }
         #[cfg(not(windows))]
         {
             original_data_home = std::env::var("XDG_DATA_HOME");
-            std::env::set_var("XDG_DATA_HOME", data_dir.to_str().unwrap());
+            set_env_var!("XDG_DATA_HOME", data_dir.to_str().unwrap());
         }
 
         let result = check_suiup_data_dir();
@@ -276,17 +278,17 @@ mod tests {
         #[cfg(windows)]
         {
             if let Ok(val) = original_data_home {
-                std::env::set_var("LOCALAPPDATA", val);
+                set_env_var!("LOCALAPPDATA", val);
             } else {
-                std::env::remove_var("LOCALAPPDATA");
+                remove_env_var!("LOCALAPPDATA");
             }
         }
         #[cfg(not(windows))]
         {
             if let Ok(val) = original_data_home {
-                std::env::set_var("XDG_DATA_HOME", val);
+                set_env_var!("XDG_DATA_HOME", val);
             } else {
-                std::env::remove_var("XDG_DATA_HOME");
+                remove_env_var!("XDG_DATA_HOME");
             }
         }
     }
@@ -301,12 +303,12 @@ mod tests {
         #[cfg(windows)]
         {
             original_data_home = std::env::var("LOCALAPPDATA");
-            std::env::set_var("LOCALAPPDATA", data_dir.to_str().unwrap());
+            set_env_var!("LOCALAPPDATA", data_dir.to_str().unwrap());
         }
         #[cfg(not(windows))]
         {
             original_data_home = std::env::var("XDG_DATA_HOME");
-            std::env::set_var("XDG_DATA_HOME", data_dir.to_str().unwrap());
+            set_env_var!("XDG_DATA_HOME", data_dir.to_str().unwrap());
         }
 
         let path = crate::paths::get_suiup_data_dir();
@@ -324,17 +326,17 @@ mod tests {
         #[cfg(windows)]
         {
             if let Ok(val) = original_data_home {
-                std::env::set_var("LOCALAPPDATA", val);
+                set_env_var!("LOCALAPPDATA", val);
             } else {
-                std::env::remove_var("LOCALAPPDATA");
+                remove_env_var!("LOCALAPPDATA");
             }
         }
         #[cfg(not(windows))]
         {
             if let Ok(val) = original_data_home {
-                std::env::set_var("XDG_DATA_HOME", val);
+                set_env_var!("XDG_DATA_HOME", val);
             } else {
-                std::env::remove_var("XDG_DATA_HOME");
+                remove_env_var!("XDG_DATA_HOME");
             }
         }
     }
