@@ -139,6 +139,8 @@ pub enum BinaryName {
     Walrus,
     #[value(name = "site-builder")]
     WalrusSites,
+    #[value(name = "move-analyzer")]
+    MoveAnalyzer,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -164,6 +166,7 @@ impl BinaryName {
             BinaryName::Sui => "sui",
             BinaryName::Walrus => "walrus",
             BinaryName::WalrusSites => "site-builder",
+            BinaryName::MoveAnalyzer => "move-analyzer",
         }
     }
 }
@@ -175,6 +178,7 @@ impl std::fmt::Display for BinaryName {
             BinaryName::Sui => write!(f, "sui"),
             BinaryName::Walrus => write!(f, "walrus"),
             BinaryName::WalrusSites => write!(f, "site-builder"),
+            BinaryName::MoveAnalyzer => write!(f, "move-analyzer"),
         }
     }
 }
@@ -188,6 +192,7 @@ impl std::str::FromStr for BinaryName {
             "mvr" => Ok(BinaryName::Mvr),
             "walrus" => Ok(BinaryName::Walrus),
             "site-builder" => Ok(BinaryName::WalrusSites),
+            "move-analyzer" => Ok(BinaryName::MoveAnalyzer),
             _ => Err(format!("Unknown binary: {}", s)),
         }
     }
