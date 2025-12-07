@@ -86,7 +86,7 @@ suiup install sui@testnet-1.40.1 # this will install the testnet v1.40.1 release
 
 > [!NOTE]
 > You can just pass the `@1.44.2` version instead of `sui@testnet-1.44.2` or omit it altogether `suiup install sui`, but you must remember
-> that the default will be testnet release for `sui/walrus`. It's recommended to pass the release for the network you want to install.
+> that the default will be testnet release for `sui/walrus/move-analyzer`. It's recommended to pass the release for the network you want to install.
 
 ### Update `sui` to latest version
 
