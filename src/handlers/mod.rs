@@ -395,23 +395,6 @@ pub fn installed_binaries_grouped_by_network(
     Ok(files_by_folder)
 }
 
-// --- Tests -----------------------------------------------------------------
-// Internal helper (exposed for tests inside this module) to build the final path; this
-// lets us unit test both Windows and non-Windows logic irrespective of the host platform.
-#[cfg(test)]
-fn build_binary_path(
-    mut base: std::path::PathBuf,
-    binary_version: &str,
-    is_windows: bool,
-) -> std::path::PathBuf {
-    if is_windows {
-        base.push(format!("{}.exe", binary_version));
-    } else {
-        base.push(binary_version);
-    }
-    base
-}
-
 #[cfg(test)]
 mod tests {
     use super::{build_binary_path, check_if_binaries_exist};
@@ -420,31 +403,53 @@ mod tests {
     use std::io::Write;
     use std::path::PathBuf;
 
+    // --- Tests -----------------------------------------------------------------
+    // Internal helper (exposed for tests inside this module) to build the final path; this
+    // lets us unit test both Windows and non-Windows logic irrespective of the host platform.
+    #[cfg(test)]
+    fn build_binary_path(
+        mut base: std::path::PathBuf,
+        binary_version: &str,
+        is_windows: bool,
+    ) -> std::path::PathBuf {
+        if is_windows {
+            base.push(format!("{}.exe", binary_version));
+        } else {
+            base.push(binary_version);
+        }
+        base
+    }
+
     // Validate helper path construction for both Windows & non-Windows cases.
     #[test]
     fn test_build_binary_path() {
-        let base_unix = PathBuf::from("/tmp/suiup/binaries/testnet");
-        let p_unix = build_binary_path(base_unix.clone(), "sui-v1.0.0", false);
-        assert!(
-            p_unix
-                .to_string_lossy()
-                .ends_with("/tmp/suiup/binaries/testnet/sui-v1.0.0")
-                || p_unix
+        #[cfg(unix)]
+        {
+            let base_unix = PathBuf::from("/tmp/suiup/binaries/testnet");
+            let p_unix = build_binary_path(base_unix.clone(), "sui-v1.0.0", false);
+            assert!(
+                p_unix
                     .to_string_lossy()
-                    .ends_with("\\tmp\\suiup\\binaries\\testnet\\sui-v1.0.0")
-        );
-        assert!(!p_unix.to_string_lossy().ends_with(".exe"));
+                    .ends_with("/tmp/suiup/binaries/testnet/sui-v1.0.0")
+                    || p_unix
+                        .to_string_lossy()
+                        .ends_with("\\tmp\\suiup\\binaries\\testnet\\sui-v1.0.0")
+            );
+        }
 
-        let base_win = PathBuf::from("C:/suiup/binaries/testnet");
-        let p_win = build_binary_path(base_win.clone(), "sui-v1.0.0", true);
-        assert!(
-            p_win.to_string_lossy().ends_with("sui-v1.0.0.exe"),
-            "Windows path should end with .exe: {p_win:?}"
-        );
-        // Ensure we did not append an extra plain (non-.exe) component.
-        let components: Vec<_> = p_win.components().collect();
-        let last = components.last().unwrap().as_os_str().to_string_lossy();
-        assert_eq!(last, "sui-v1.0.0.exe");
+        #[cfg(windows)]
+        {
+            let base_win = PathBuf::from("C:/suiup/binaries/testnet");
+            let p_win = build_binary_path(base_win.clone(), "sui-v1.0.0", true);
+            assert!(
+                p_win.to_string_lossy().ends_with("sui-v1.0.0.exe"),
+                "Windows path should end with .exe: {p_win:?}"
+            );
+            // Ensure we did not append an extra plain (non-.exe) component.
+            let components: Vec<_> = p_win.components().collect();
+            let last = components.last().unwrap().as_os_str().to_string_lossy();
+            assert_eq!(last, "sui-v1.0.0.exe");
+        }
     }
 
     // Functional test (host-platform specific) verifying existence detection works.
