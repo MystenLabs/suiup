@@ -397,7 +397,7 @@ pub fn installed_binaries_grouped_by_network(
 
 #[cfg(test)]
 mod tests {
-    use super::{build_binary_path, check_if_binaries_exist};
+    use super::check_if_binaries_exist;
     use crate::paths::binaries_dir;
     use std::fs::{self, File};
     use std::io::Write;
