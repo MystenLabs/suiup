@@ -456,7 +456,7 @@ mod tests {
         let (var, original) = ("LOCALAPPDATA", std::env::var("LOCALAPPDATA").ok());
         #[cfg(not(windows))]
         let (var, original) = ("XDG_DATA_HOME", std::env::var("XDG_DATA_HOME").ok());
-        std::env::set_var(var, temp.path());
+        crate::set_env_var!(var, temp.path());
 
         let mut network_dir = binaries_dir();
         network_dir.push("testnet");
@@ -477,9 +477,9 @@ mod tests {
 
         // Restore original environment variable (best effort).
         if let Some(val) = original {
-            std::env::set_var(var, val);
+            crate::set_env_var!(var, val);
         } else {
-            std::env::remove_var(var);
+            crate::remove_env_var!(var);
         }
     }
 }
