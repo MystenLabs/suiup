@@ -57,7 +57,8 @@ pub async fn install_from_release(
     };
 
     let version = extract_version_from_release(&filename)?;
-    let binary_name = if debug && name == "sui" {
+    // Sui repo binaries (sui, sui-node) have debug variants available
+    let binary_name = if debug && (name == "sui" || name == "sui-node") {
         format!("{}-debug", name)
     } else {
         name.to_string()

@@ -1,6 +1,6 @@
 # Suiup - the installer and manager for CLI tools in the Sui ecosystem
 
-`suiup` is a tool to install and manage different versions of CLI tools for working in the Sui ecosystem. It allows you to easily install and switch between different versions of `sui`, `mvr`, `walrus`.
+`suiup` is a tool to install and manage different versions of CLI tools for working in the Sui ecosystem. It allows you to easily install and switch between different versions of `sui`, `sui-node`, `mvr`, `walrus`.
 After installation, run `suiup list` to find which binaries you can install. Check out the [Installation](#installation) to install and the [Quick Start](#quick-start) guide for how-to-use examples.
 
 # Why suiup?
@@ -13,9 +13,9 @@ As new tools like [mvr](https://docs.suins.io/move-registry#using-mvr) and [walr
 
 With `suiup`, you can:
 
-- Install specific versions of `sui`, `mvr`, `walrus`, or `site-builder (walrus-sites)` (with more tools coming soon)
+- Install specific versions of `sui`, `sui-node`, `mvr`, `walrus`, or `site-builder (walrus-sites)` (with more tools coming soon)
 - Install from a branch in the repository to try unreleased features or fixes
-- Get debug builds of `sui` (needed for commands like `sui move test --coverage`)
+- Get debug builds of `sui` or `sui-node` (needed for commands like `sui move test --coverage`)
 - List and switch between installed binaries for different networks (e.g., devnet vs mainnet)
 - Simplify tool installation in CI environments
 
@@ -121,6 +121,14 @@ suiup install mvr@0.0.8 # this will install the MVR CLI v0.0.8 release
 ```bash
 suiup install move-analyzer
 suiup install move-analyzer@mainnet
+```
+
+### Install `sui-node` (for node operators)
+
+```bash
+suiup install sui-node
+suiup install sui-node@testnet-1.40.1 # install a specific version
+suiup install sui-node@testnet --debug # install the debug build
 ```
 
 ### List available binaries to install
