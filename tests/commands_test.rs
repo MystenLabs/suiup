@@ -47,10 +47,12 @@ mod tests {
         assert_eq!(expected, result);
 
         let result = parse_component_with_version("random");
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Invalid binary name: random"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid binary name: random")
+        );
 
         Ok(())
     }
