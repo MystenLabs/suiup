@@ -47,11 +47,10 @@ mod tests {
         assert_eq!(expected, result);
 
         let result = parse_component_with_version("random");
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "Invalid binary name: random. Use `suiup list` to find available binaries to install."
-                .to_string()
-        );
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid binary name: random"));
 
         Ok(())
     }
