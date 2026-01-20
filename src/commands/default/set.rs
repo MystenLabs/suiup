@@ -189,7 +189,13 @@ impl Command {
             *debug,
         )?;
 
-        println!("Default binary updated successfully");
+        if *debug {
+            println!(
+                "Default binary updated to {name}@{network}-{version} version which was built in debug mode"
+            );
+        } else {
+            println!("Default binary updated to {name}@{network}-{version} version");
+        }
         Ok(())
     }
 }
