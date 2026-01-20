@@ -489,7 +489,7 @@ mod tests {
         // Use switch command to go back to testnet (should pick latest, which is 1.40.1)
         let mut cmd = suiup_command(vec!["switch", "sui@testnet"], &test_env);
         cmd.assert().success().stdout(predicate::str::contains(
-            "Successfully switched to sui-v1.40.1 from testnet",
+            "Default binary updated to sui@testnet-v1.40.1 version",
         ));
 
         // Verify switch command maintained the default (since it picked the latest)
