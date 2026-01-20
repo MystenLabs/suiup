@@ -218,6 +218,7 @@ fn find_archive_name() -> Result<String> {
     let (os, arch) = detect_os_arch()?;
 
     let os = match os.as_str() {
+        "ubuntu" => "Linux-musl",
         "linux" => "Linux-musl",
         "windows" => "Windows",
         "macos" => "macOS",
