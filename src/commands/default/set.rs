@@ -34,6 +34,15 @@ pub struct Command {
 }
 
 impl Command {
+    /// Create a new Command with default options (no debug, no nightly)
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            debug: false,
+            nightly: None,
+        }
+    }
+
     pub fn exec(&self) -> Result<()> {
         let Command {
             name,
