@@ -227,6 +227,11 @@ pub fn parse_component_with_version(s: &str) -> Result<CommandMetadata, anyhow::
         2 => {
             let component = BinaryName::from_str(parts[0], true)
                 .map_err(|_| anyhow!("Invalid binary name: {}. Use `suiup list` to find available binaries to install or `suiup show` to see which binaries are already installed.\nWhen specifying versions, use `@`, e.g.: sui@v1.60.0\n\nMore information in the docs: https://github.com/mystenLabs/suiup?tab=readme-ov-file#switch-between-versions-note-that-default-set-requires-to-specify-a-version", parts[0]))?;
+            if parts[1].is_empty() {
+                bail!(
+                    "Version cannot be empty. Use 'binary' or 'binary@version' (e.g., sui@v1.60.0)"
+                );
+            }
             let (network, version) = parse_version_spec(Some(parts[1].to_string()))?;
             let component_metadata = CommandMetadata {
                 name: component,
@@ -252,7 +257,23 @@ pub fn parse_version_spec(spec: Option<String>) -> Result<(String, Option<String
             } else if spec == "testnet" || spec == "devnet" || spec == "mainnet" {
                 Ok((spec, None))
             } else {
-                // Assume it's a version for testnet
+                // Validate that it looks like a version (starts with 'v' + digit or digit, and contains a dot)
+                let starts_valid = spec
+                    .chars()
+                    .next()
+                    .map(|c| {
+                        c.is_ascii_digit()
+                            || (c == 'v'
+                                && spec.chars().nth(1).map_or(false, |c2| c2.is_ascii_digit()))
+                    })
+                    .unwrap_or(false);
+                let has_dot = spec.contains('.');
+                if !starts_valid || !has_dot {
+                    bail!(
+                        "Invalid version format: '{}'. Expected a version like 'v1.60.0' or '1.60.0', or when applicable, 'testnet', 'devnet', 'mainnet'.",
+                        spec
+                    );
+                }
                 Ok(("testnet".to_string(), Some(spec)))
             }
         }

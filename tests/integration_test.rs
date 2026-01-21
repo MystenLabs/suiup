@@ -406,23 +406,17 @@ mod tests {
         let test_env = TestEnv::new()?;
         test_env.initialize_paths()?;
 
-        // Test invalid format (missing @)
-        let mut cmd = suiup_command(vec!["switch", "sui"], &test_env);
-        cmd.assert()
-            .failure()
-            .stderr(predicate::str::contains("Invalid format"));
-
         // Test invalid format (empty parts)
         let mut cmd = suiup_command(vec!["switch", "sui@"], &test_env);
         cmd.assert().failure().stderr(predicate::str::contains(
-            "Binary name and network/release cannot be empty",
+            "Version cannot be empty. Use 'binary' or 'binary@version' (e.g., sui@v1.60.0)",
         ));
 
         // Test non-existent binary
         let mut cmd = suiup_command(vec!["switch", "sui@nonexistent"], &test_env);
         cmd.assert()
             .failure()
-            .stderr(predicate::str::contains("No installed binary found"));
+            .stderr(predicate::str::contains("Invalid version format: 'nonexistent'. Expected a version like 'v1.60.0' or '1.60.0', or when applicable, 'testnet', 'devnet', 'mainnet'."));
 
         Ok(())
     }
