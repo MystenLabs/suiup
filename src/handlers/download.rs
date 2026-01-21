@@ -100,7 +100,7 @@ pub fn detect_os_arch() -> Result<(String, String), Error> {
     let os = match whoami::platform() {
         whoami::Platform::Linux => "ubuntu",
         whoami::Platform::Windows => "windows",
-        whoami::Platform::MacOS => "macos",
+        whoami::Platform::Mac => "macos",
         _ => bail!("Unsupported OS. Supported only: Linux, Windows, MacOS"),
     };
     let arch = match std::env::consts::ARCH {
