@@ -163,7 +163,10 @@ pub async fn download_release_at_version(
             ));
         }
 
-        let release: Release = response.json().await?;
+        let release: Release = response
+            .json()
+            .await
+            .map_err(|e| anyhow!("Failed to parse GitHub release response: {}", e))?;
         download_asset_from_github(&release, &os, &arch, github_token).await
     }
 }
@@ -212,16 +215,13 @@ pub async fn download_file(
 
     let response = request.send().await?;
 
-    let response = response.error_for_status();
-
-    if let Err(ref e) = response {
-        bail!("Encountered unexpected error: {e}");
-    }
-
-    let response = response.unwrap();
-
-    if !response.status().is_success() {
-        return Err(anyhow!("Failed to download: {}", response.status()));
+    let status = response.status();
+    if !status.is_success() {
+        let body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unable to read response body".to_string());
+        bail!("Failed to download (status {}): {}", status, body);
     }
 
     let mut total_size = response.content_length().unwrap_or(0);
