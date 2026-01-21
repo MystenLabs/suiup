@@ -51,8 +51,26 @@ pub async fn release_list(
         .get(ETAG)
         .and_then(|v| v.to_str().ok())
         .map(String::from);
-    let response = response.error_for_status()?;
-    let releases: Vec<Release> = response.json().await?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unable to read response body".to_string());
+        bail!(
+            "GitHub API request failed with status {}: {}",
+            status,
+            body
+        );
+    }
+
+    let releases: Vec<Release> = response.json().await.map_err(|e| {
+        anyhow!(
+            "Failed to parse GitHub releases response: {}",
+            e
+        )
+    })?;
     save_release_list(repo, &releases, etag.clone())?;
 
     Ok((releases, etag))

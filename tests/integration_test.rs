@@ -39,6 +39,12 @@ mod tests {
             .env(CONFIG_HOME, &test_env.config_dir)
             .env(CACHE_HOME, &test_env.cache_dir)
             .env(HOME, test_env.temp_dir.path());
+
+        // Pass through GITHUB_TOKEN if set
+        if let Ok(token) = std::env::var("GITHUB_TOKEN") {
+            cmd.env("GITHUB_TOKEN", token);
+        }
+
         cmd
     }
 
@@ -394,9 +400,9 @@ mod tests {
 
         // Test switch with non-existent binary (should fail gracefully)
         let mut cmd = suiup_command(vec!["switch", "sui@testnet"], &test_env);
-        cmd.assert()
-            .failure()
-            .stderr(predicate::str::contains("No installed binary found"));
+        cmd.assert().failure().stderr(predicate::str::contains(
+            "No binaries installed for testnet",
+        ));
 
         Ok(())
     }
