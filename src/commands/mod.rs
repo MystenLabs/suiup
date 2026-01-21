@@ -264,7 +264,7 @@ pub fn parse_version_spec(spec: Option<String>) -> Result<(String, Option<String
                     .map(|c| {
                         c.is_ascii_digit()
                             || (c == 'v'
-                                && spec.chars().nth(1).map_or(false, |c2| c2.is_ascii_digit()))
+                                && spec.chars().nth(1).is_some_and(|c2| c2.is_ascii_digit()))
                     })
                     .unwrap_or(false);
                 let has_dot = spec.contains('.');
