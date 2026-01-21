@@ -163,9 +163,10 @@ pub async fn download_release_at_version(
             ));
         }
 
-        let release: Release = response.json().await.map_err(|e| {
-            anyhow!("Failed to parse GitHub release response: {}", e)
-        })?;
+        let release: Release = response
+            .json()
+            .await
+            .map_err(|e| anyhow!("Failed to parse GitHub release response: {}", e))?;
         download_asset_from_github(&release, &os, &arch, github_token).await
     }
 }

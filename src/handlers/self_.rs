@@ -67,9 +67,10 @@ async fn get_latest_version() -> Result<Ver> {
         ));
     }
 
-    let release: GitHubRelease = response.json().await.map_err(|e| {
-        anyhow!("Failed to parse GitHub release response: {}", e)
-    })?;
+    let release: GitHubRelease = response
+        .json()
+        .await
+        .map_err(|e| anyhow!("Failed to parse GitHub release response: {}", e))?;
     Ver::from_str(&release.tag_name)
 }
 
