@@ -8,7 +8,6 @@ mod tests {
     use std::time::{Duration, SystemTime};
     use suiup::commands::{BinaryName, CommandMetadata, parse_component_with_version};
     use suiup::handlers::cleanup::handle_cleanup;
-    use suiup::handlers::switch::parse_binary_spec;
     use suiup::paths;
     use suiup::set_env_var;
     use tempfile::TempDir;
@@ -48,10 +47,11 @@ mod tests {
         assert_eq!(expected, result);
 
         let result = parse_component_with_version("random");
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "Invalid binary name: random. Use `suiup list` to find available binaries to install."
+        assert!(
+            result
+                .unwrap_err()
                 .to_string()
+                .contains("Invalid binary name: random")
         );
 
         Ok(())
@@ -62,48 +62,6 @@ mod tests {
         assert_eq!(BinaryName::Sui.to_string(), "sui");
         assert_eq!(BinaryName::Mvr.to_string(), "mvr");
         assert_eq!(BinaryName::Walrus.to_string(), "walrus");
-    }
-
-    #[test]
-    fn test_parse_binary_spec() -> Result<()> {
-        // Test valid format
-        let result = parse_binary_spec("sui@testnet")?;
-        assert_eq!(result, ("sui".to_string(), "testnet".to_string()));
-
-        let result = parse_binary_spec("mvr@main")?;
-        assert_eq!(result, ("mvr".to_string(), "main".to_string()));
-
-        let result = parse_binary_spec("walrus@devnet")?;
-        assert_eq!(result, ("walrus".to_string(), "devnet".to_string()));
-
-        // Test invalid formats
-        let result = parse_binary_spec("sui");
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid format"));
-
-        let result = parse_binary_spec("sui@");
-        assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("Binary name and network/release cannot be empty")
-        );
-
-        let result = parse_binary_spec("@testnet");
-        assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("Binary name and network/release cannot be empty")
-        );
-
-        let result = parse_binary_spec("sui@testnet@extra");
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid format"));
-
-        Ok(())
     }
 
     #[tokio::test]

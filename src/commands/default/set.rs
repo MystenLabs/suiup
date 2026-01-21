@@ -34,6 +34,15 @@ pub struct Command {
 }
 
 impl Command {
+    /// Create a new Command with default options (no debug, no nightly)
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            debug: false,
+            nightly: None,
+        }
+    }
+
     pub fn exec(&self) -> Result<()> {
         let Command {
             name,
@@ -180,7 +189,13 @@ impl Command {
             *debug,
         )?;
 
-        println!("Default binary updated successfully");
+        if *debug {
+            println!(
+                "Default binary updated to {name}@{network}-{version} version which was built in debug mode"
+            );
+        } else {
+            println!("Default binary updated to {name}@{network}-{version} version");
+        }
         Ok(())
     }
 }

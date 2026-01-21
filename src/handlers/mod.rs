@@ -26,7 +26,6 @@ pub mod install;
 pub mod release;
 pub mod self_;
 pub mod show;
-pub mod switch;
 pub mod update;
 pub mod version;
 pub mod which;

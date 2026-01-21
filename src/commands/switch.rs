@@ -4,7 +4,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::handlers::switch::handle_switch;
+use super::default::set::Command as SetCommand;
 
 /// Switch to a different version of an installed binary.
 #[derive(Args, Debug)]
@@ -17,6 +17,7 @@ pub struct Command {
 
 impl Command {
     pub fn exec(&self) -> Result<()> {
-        handle_switch(&self.binary_spec)
+        let set_cmd = SetCommand::new(self.binary_spec.clone());
+        set_cmd.exec()
     }
 }

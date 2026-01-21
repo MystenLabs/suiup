@@ -54,11 +54,23 @@ async fn get_latest_version() -> Result<Ver> {
         .send()
         .await?;
 
-    if !response.status().is_success() {
-        return Err(anyhow!("Failed to fetch latest version from GitHub"));
+    let status = response.status();
+    if !status.is_success() {
+        let body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unable to read response body".to_string());
+        return Err(anyhow!(
+            "Failed to fetch latest version from GitHub (status {}): {}",
+            status,
+            body
+        ));
     }
 
-    let release: GitHubRelease = response.json().await?;
+    let release: GitHubRelease = response
+        .json()
+        .await
+        .map_err(|e| anyhow!("Failed to parse GitHub release response: {}", e))?;
     Ver::from_str(&release.tag_name)
 }
 
@@ -218,6 +230,7 @@ fn find_archive_name() -> Result<String> {
     let (os, arch) = detect_os_arch()?;
 
     let os = match os.as_str() {
+        "ubuntu" => "Linux-musl",
         "linux" => "Linux-musl",
         "windows" => "Windows",
         "macos" => "macOS",
