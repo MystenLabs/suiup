@@ -65,7 +65,7 @@ mod tests {
         // NOT OK: !sui + debug
         let mut cmd = suiup_command(vec!["install", "mvr", "--debug"], &test_env);
         cmd.assert().failure().stderr(predicate::str::contains(
-            "Error: Debug flag is only available for the `sui` binary",
+            "Error: Debug flag is only available for binaries from the Sui repository",
         ));
 
         // OK: nightly + debug
