@@ -26,8 +26,8 @@ pub async fn install_component(
     let installed_bins_dir = binaries_dir();
     create_dir_all(&installed_bins_dir)?;
 
-    if name != BinaryName::Sui && debug && nightly.is_none() {
-        return Err(anyhow!("Debug flag is only available for the `sui` binary"));
+    if !name.is_sui_repo_binary() && debug && nightly.is_none() {
+        return Err(anyhow!("Debug flag is only available for binaries from the Sui repository (`sui`, `sui-node`)"));
     }
 
     if nightly.is_some() && version.is_some() {

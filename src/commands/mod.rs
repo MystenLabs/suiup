@@ -135,6 +135,8 @@ pub enum BinaryName {
     Mvr,
     #[value(name = "sui")]
     Sui,
+    #[value(name = "sui-node")]
+    SuiNode,
     #[value(name = "walrus")]
     Walrus,
     #[value(name = "site-builder")]
@@ -160,10 +162,19 @@ impl BinaryName {
         }
     }
 
+    /// Returns true if this binary comes from the Sui repository
+    pub fn is_sui_repo_binary(&self) -> bool {
+        matches!(
+            self,
+            BinaryName::Sui | BinaryName::SuiNode | BinaryName::MoveAnalyzer
+        )
+    }
+
     pub fn to_str(&self) -> &str {
         match self {
             BinaryName::Mvr => "mvr",
             BinaryName::Sui => "sui",
+            BinaryName::SuiNode => "sui-node",
             BinaryName::Walrus => "walrus",
             BinaryName::WalrusSites => "site-builder",
             BinaryName::MoveAnalyzer => "move-analyzer",
@@ -176,6 +187,7 @@ impl std::fmt::Display for BinaryName {
         match self {
             BinaryName::Mvr => write!(f, "mvr"),
             BinaryName::Sui => write!(f, "sui"),
+            BinaryName::SuiNode => write!(f, "sui-node"),
             BinaryName::Walrus => write!(f, "walrus"),
             BinaryName::WalrusSites => write!(f, "site-builder"),
             BinaryName::MoveAnalyzer => write!(f, "move-analyzer"),
@@ -189,6 +201,7 @@ impl std::str::FromStr for BinaryName {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "sui" => Ok(BinaryName::Sui),
+            "sui-node" => Ok(BinaryName::SuiNode),
             "mvr" => Ok(BinaryName::Mvr),
             "walrus" => Ok(BinaryName::Walrus),
             "site-builder" => Ok(BinaryName::WalrusSites),
