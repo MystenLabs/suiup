@@ -33,7 +33,16 @@ pub mod which;
 pub const RELEASES_ARCHIVES_FOLDER: &str = "releases";
 
 pub fn available_components() -> &'static [&'static str] {
-    &["sui", "mvr", "walrus", "site-builder", "move-analyzer"]
+    &[
+        "sui",
+        "mvr",
+        "walrus",
+        "site-builder",
+        "move-analyzer",
+        "signers",
+        "ledger-signer",
+        "yubikey-signer",
+    ]
 }
 
 // Main component handling function
@@ -121,7 +130,11 @@ pub fn update_after_install(
     let input = if yes {
         "y".to_string()
     } else {
-        let prompt = "Do you want to set this new installed version as the default one? [y/N] ";
+        let prompt = if name.len() > 1 {
+            "Do you want to set these new installed versions as default? [y/N] "
+        } else {
+            "Do you want to set this new installed version as the default one? [y/N] "
+        };
 
         print!("{prompt}");
         std::io::stdout().flush().unwrap();

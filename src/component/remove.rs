@@ -19,12 +19,34 @@ pub async fn remove_component(binary: BinaryName) -> Result<()> {
     let binaries_to_remove = installed_binaries
         .binaries()
         .iter()
-        .filter(|b| binary.to_string() == b.binary_name)
+        .filter(|b| {
+            if binary == BinaryName::Signers {
+                b.binary_name == "ledger-signer" || b.binary_name == "yubikey-signer"
+            } else {
+                binary.to_string() == b.binary_name
+            }
+        })
         .collect::<Vec<_>>();
 
     if binaries_to_remove.is_empty() {
         println!("No binaries found to remove");
         return Ok(());
+    }
+
+    if binary == BinaryName::Signers {
+        let found_names: HashSet<&str> = binaries_to_remove
+            .iter()
+            .map(|b| b.binary_name.as_str())
+            .collect();
+
+        for &expected in &["ledger-signer", "yubikey-signer"] {
+            if !found_names.contains(expected) {
+                println!(
+                    "Warning: {} was not found among installed binaries, so it cannot be removed.",
+                    expected
+                );
+            }
+        }
     }
 
     println!("Binaries to remove: {binaries_to_remove:?}");
@@ -80,7 +102,12 @@ pub async fn remove_component(binary: BinaryName) -> Result<()> {
     write_json_file(&default_file, &default_binaries)?;
 
     // Update installed binaries metadata
-    installed_binaries.remove_binary(&binary.to_string());
+    if binary == BinaryName::Signers {
+        installed_binaries.remove_binary("ledger-signer");
+        installed_binaries.remove_binary("yubikey-signer");
+    } else {
+        installed_binaries.remove_binary(&binary.to_string());
+    }
     debug!("Removed {binary} from installed_binaries JSON file. Saving updated data");
     installed_binaries.save_to_file()?;
 

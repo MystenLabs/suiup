@@ -18,13 +18,12 @@ use anyhow::bail;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::time::Duration;
 
-pub fn install_binary(
+pub fn register_binary(
     name: &str,
     network: String,
     version: &str,
     debug: bool,
     binary_path: PathBuf,
-    yes: bool,
 ) -> Result<(), Error> {
     let mut installed_binaries = InstalledBinaries::new()?;
     installed_binaries.add_binary(BinaryVersion {
@@ -35,6 +34,18 @@ pub fn install_binary(
         path: Some(binary_path.to_string_lossy().to_string()),
     });
     installed_binaries.save_to_file()?;
+    Ok(())
+}
+
+pub fn install_binary(
+    name: &str,
+    network: String,
+    version: &str,
+    debug: bool,
+    binary_path: PathBuf,
+    yes: bool,
+) -> Result<(), Error> {
+    register_binary(name, network.clone(), version, debug, binary_path)?;
     update_after_install(&vec![name.to_string()], network, version, debug, yes)?;
     Ok(())
 }
@@ -170,36 +181,63 @@ pub async fn install_from_nightly(
 pub async fn install_standalone(
     version: Option<String>,
     repo: Repo,
+    binary_names: Vec<String>,
     yes: bool,
 ) -> Result<(), Error> {
+    let mut installer = standalone::StandaloneInstaller::new(repo);
     let network = "standalone".to_string();
-    let binary_name = repo.binary_name();
-    if !check_if_binaries_exist(
-        binary_name,
-        network.clone(),
-        &version.clone().unwrap_or_default(),
-    )? {
-        let mut installer = standalone::StandaloneInstaller::new(repo);
-        let installed_version = installer.download_version(version).await?;
 
-        println!("Adding binary: {binary_name}-{installed_version}");
-
-        let binary_path = binaries_dir()
-            .join(&network)
-            .join(format!("{}-{}", binary_name, installed_version));
-        install_binary(
-            binary_name,
-            network,
-            &installed_version,
-            false,
-            binary_path,
-            yes,
-        )?;
+    // Resolve version if needed
+    let version = if let Some(v) = version {
+        v
     } else {
-        let version = version.unwrap_or_default();
-        println!(
-            "Binary {binary_name}-{version} already installed. Use `suiup default set {binary_name} {version}` to set the default version to the specified one."
-        );
+        installer.get_releases().await?;
+        installer.get_latest_release()?.tag_name.clone()
+    };
+
+    // If no specific binaries requested, use the default for the repo
+    let binary_names = if binary_names.is_empty() {
+        vec![repo.binary_name().to_string()]
+    } else {
+        binary_names
+    };
+
+    let mut installed_binaries_list = Vec::new();
+
+    for binary_name in binary_names {
+        if !check_if_binaries_exist(&binary_name, network.clone(), &version)? {
+            let installed_version = installer
+                .download_version(Some(version.clone()), Some(binary_name.clone()))
+                .await?;
+
+            println!("Adding binary: {binary_name}-{installed_version}");
+
+            let binary_path = binaries_dir()
+                .join(&network)
+                .join(format!("{}-{}", binary_name, installed_version));
+
+            #[cfg(target_os = "windows")]
+            let binary_path = binaries_dir()
+                .join(&network)
+                .join(format!("{}-{}.exe", binary_name, installed_version));
+
+            register_binary(
+                &binary_name,
+                network.clone(),
+                &installed_version,
+                false,
+                binary_path,
+            )?;
+            installed_binaries_list.push(binary_name);
+        } else {
+            println!(
+                "Binary {binary_name}-{version} already installed. Use `suiup default set {binary_name} {version}` to set the default version to the specified one."
+            );
+        }
+    }
+
+    if !installed_binaries_list.is_empty() {
+        update_after_install(&installed_binaries_list, network, &version, false, yes)?;
     }
 
     Ok(())

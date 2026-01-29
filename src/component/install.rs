@@ -84,11 +84,33 @@ pub async fn install_component(
                             return Err(anyhow!("Invalid binary name for standalone installation"));
                         }
                     },
+                    vec![],
                     yes,
                 )
                 .await?;
             }
         }
+        (BinaryName::Signers, Some(_)) => {
+            // cannot install signers from nightly
+            return Err(anyhow!("Nightly mode is not supported for signers"));
+        }
+        (BinaryName::Signers | BinaryName::LedgerSigner | BinaryName::YubikeySigner, nightly) => {
+            create_dir_all(installed_bins_dir.join("standalone"))?;
+            if let Some(branch) = nightly {
+                install_from_nightly(&name, branch, debug, yes).await?;
+            } else {
+                let binaries = match name {
+                    BinaryName::Signers => {
+                        vec!["ledger-signer".to_string(), "yubikey-signer".to_string()]
+                    }
+                    BinaryName::LedgerSigner => vec!["ledger-signer".to_string()],
+                    BinaryName::YubikeySigner => vec!["yubikey-signer".to_string()],
+                    _ => unreachable!(),
+                };
+                install_standalone(version, Repo::Signers, binaries, yes).await?;
+            }
+        }
+
         (_, Some(branch)) => {
             install_from_nightly(&name, branch, debug, yes).await?;
         }
