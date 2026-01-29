@@ -100,10 +100,19 @@ pub async fn install_component(
                             return Err(anyhow!("Invalid binary name for standalone installation"));
                         }
                     },
+                    None,
                     yes,
                     github_token,
                 )
                 .await?;
+            }
+        }
+        (BinaryName::LedgerSigner | BinaryName::YubikeySigner, nightly) => {
+            create_dir_all(installed_bins_dir.join("standalone"))?;
+            if let Some(branch) = nightly {
+                install_from_nightly(&name, branch, debug, yes).await?;
+            } else {
+                install_standalone(version, Repo::Signers, Some(name), yes).await?;
             }
         }
         (_, Some(branch)) => {

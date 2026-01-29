@@ -17,12 +17,13 @@ use crate::paths::{default_file_path, installed_binaries_file};
 
 pub type Version = String;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Repo {
     Sui,
     Mvr,
     Walrus,
     WalrusSites,
+    Signers,
 }
 
 impl Repo {
@@ -33,6 +34,7 @@ impl Repo {
             Repo::Sui => "sui",
             Repo::Walrus => "walrus",
             Repo::WalrusSites => "site-builder",
+            Repo::Signers => "signers",
         }
     }
 }
@@ -44,6 +46,7 @@ impl Display for Repo {
             Self::Sui => write!(f, "MystenLabs/sui"),
             Self::Walrus => write!(f, "MystenLabs/walrus"),
             Self::WalrusSites => write!(f, "MystenLabs/walrus-sites"),
+            Self::Signers => write!(f, "MystenLabs/rust-signers"),
         }
     }
 }
