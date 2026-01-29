@@ -106,9 +106,15 @@ pub async fn install_from_nightly(
     let binaries_folder = binaries_dir();
     let binaries_folder_branch = binaries_folder.join(branch);
 
-    let mut args = vec![
+    let mut args = vec![];
+
+    if name == &BinaryName::LedgerSigner {
+        args.push("+nightly");
+    }
+
+    args.extend(vec![
         "install", "--locked", "--force", "--git", repo_url, "--branch", branch,
-    ];
+    ]);
 
     if name == &BinaryName::Walrus {
         args.push("walrus-service");
@@ -170,33 +176,53 @@ pub async fn install_from_nightly(
 pub async fn install_standalone(
     version: Option<String>,
     repo: Repo,
+    binary: Option<BinaryName>,
     yes: bool,
 ) -> Result<(), Error> {
+    let mut installer = standalone::StandaloneInstaller::new(repo);
     let network = "standalone".to_string();
-    let binary_name = repo.binary_name();
-    if !check_if_binaries_exist(
-        binary_name,
-        network.clone(),
-        &version.clone().unwrap_or_default(),
-    )? {
-        let mut installer = standalone::StandaloneInstaller::new(repo);
-        let installed_version = installer.download_version(version).await?;
+
+    // Resolve version if needed
+    let version = if let Some(v) = version {
+        v
+    } else {
+        installer.get_releases().await?;
+        installer.get_latest_release()?.tag_name.clone()
+    };
+
+    let binary_name = match binary {
+        Some(b) => b.to_str().to_string(),
+        None => repo.binary_name().to_string(),
+    };
+
+    let mut installed_binaries_list = Vec::new();
+
+    if !check_if_binaries_exist(&binary_name, network.clone(), &version)? {
+        let installed_version = installer
+            .download_version(Some(version.clone()), Some(binary_name.clone()))
+            .await?;
 
         println!("Adding binary: {binary_name}-{installed_version}");
 
         let binary_path = binaries_dir()
             .join(&network)
             .join(format!("{}-{}", binary_name, installed_version));
+
+        #[cfg(target_os = "windows")]
+        let binary_path = binaries_dir()
+            .join(&network)
+            .join(format!("{}-{}.exe", binary_name, installed_version));
+
         install_binary(
-            binary_name,
-            network,
+            &binary_name,
+            network.clone(),
             &installed_version,
             false,
             binary_path,
             yes,
         )?;
+        installed_binaries_list.push(binary_name);
     } else {
-        let version = version.unwrap_or_default();
         println!(
             "Binary {binary_name}-{version} already installed. Use `suiup default set {binary_name} {version}` to set the default version to the specified one."
         );
