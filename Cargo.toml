@@ -6,7 +6,7 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.98"
-clap = { version = "4.5.41", features = ["derive", "env"] }
+clap = { version = "4.5.56", features = ["derive", "env"] }
 clap_complete = "4.5.52"
 colored = "3.0.0"
 comfy-table = "7.1.4"
