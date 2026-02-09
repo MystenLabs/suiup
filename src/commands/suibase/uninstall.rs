@@ -8,10 +8,20 @@ use crate::handlers::suibase;
 
 /// Run suibase uninstall script.
 #[derive(Args, Debug)]
-pub struct Command;
+pub struct Command {
+    /// Show commands without executing them.
+    #[arg(long, short = 'n')]
+    dry_run: bool,
+    /// Skip confirmation prompt.
+    #[arg(short, long)]
+    yes: bool,
+}
 
 impl Command {
     pub fn exec(&self) -> Result<()> {
-        suibase::uninstall()
+        suibase::uninstall(suibase::ActionOptions {
+            yes: self.yes,
+            dry_run: self.dry_run,
+        })
     }
 }
