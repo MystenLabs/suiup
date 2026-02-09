@@ -3,8 +3,8 @@
 
 use crate::paths::{binaries_dir, get_default_bin_dir, release_archive_dir};
 use crate::{paths::default_file_path, types::Version};
-use anyhow::anyhow;
 use anyhow::Error;
+use anyhow::anyhow;
 use flate2::read::GzDecoder;
 use std::env;
 use std::io::Write;
@@ -26,7 +26,6 @@ pub mod install;
 pub mod release;
 pub mod self_;
 pub mod show;
-pub mod switch;
 pub mod update;
 pub mod version;
 pub mod which;
@@ -34,7 +33,7 @@ pub mod which;
 pub const RELEASES_ARCHIVES_FOLDER: &str = "releases";
 
 pub fn available_components() -> &'static [&'static str] {
-    &["sui", "mvr", "walrus", "site-builder"]
+    &["sui", "mvr", "walrus", "site-builder", "move-analyzer"]
 }
 
 // Main component handling function
@@ -100,8 +99,15 @@ pub fn update_after_install(
                 .join(format!("{}-{}", binary_name, version))
         };
 
-        #[cfg(target_os = "windows")]
-        let binary_path = binary_path.with_extension("exe");
+        #[cfg(windows)]
+        let mut binary_path = binary_path.clone();
+        #[cfg(windows)]
+        {
+            if binary_path.extension() != Some("exe".as_ref()) {
+                let new_binary_path = format!("{}.exe", binary_path.display());
+                binary_path.set_file_name(new_binary_path);
+            }
+        }
 
         if !binary_path.exists() {
             println!(
@@ -158,7 +164,7 @@ pub fn update_after_install(
                     })?;
                 }
 
-                #[cfg(target_os = "windows")]
+                #[cfg(windows)]
                 let filename = format!("{}.exe", filename);
 
                 println!(
@@ -172,10 +178,17 @@ pub fn update_after_install(
 
                 println!("Setting {} as default", binary);
 
-                #[cfg(target_os = "windows")]
+                #[cfg(windows)]
                 let mut dst = dst.clone();
-                #[cfg(target_os = "windows")]
-                dst.set_extension("exe");
+                #[cfg(windows)]
+                {
+                    if dst.extension() != Some("exe".as_ref()) {
+                        let new_dst = format!("{}.exe", dst.display());
+                        dst.set_file_name(new_dst);
+                    }
+                }
+
+                tracing::debug!("Copying from {} to {}", src.display(), dst.display());
 
                 std::fs::copy(&src, &dst).map_err(|e| {
                     anyhow!(
@@ -345,11 +358,16 @@ pub fn check_if_binaries_exist(
         format!("{}-{}", binary, version)
     };
 
-    #[cfg(target_os = "windows")]
-    {
+    // Build the final expected binary path (Windows binaries have .exe extension).
+    // Previous logic incorrectly pushed both the `.exe` file name AND the plain name as an
+    // additional path component on Windows, resulting in a non-existent path like:
+    //   <...>/binaries/<network>/binary.exe/binary-version
+    // This prevented proper detection of already installed binaries.
+    if cfg!(target_os = "windows") {
         path.push(format!("{}.exe", binary_version));
+    } else {
+        path.push(&binary_version);
     }
-    path.push(&binary_version);
     Ok(path.exists())
 }
 
@@ -374,4 +392,98 @@ pub fn installed_binaries_grouped_by_network(
     }
 
     Ok(files_by_folder)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::check_if_binaries_exist;
+    use crate::paths::binaries_dir;
+    use std::fs::{self, File};
+    use std::io::Write;
+    use std::path::PathBuf;
+
+    // --- Tests -----------------------------------------------------------------
+    // Internal helper (exposed for tests inside this module) to build the final path; this
+    // lets us unit test both Windows and non-Windows logic irrespective of the host platform.
+    #[cfg(test)]
+    fn build_binary_path(
+        mut base: std::path::PathBuf,
+        binary_version: &str,
+        is_windows: bool,
+    ) -> std::path::PathBuf {
+        if is_windows {
+            base.push(format!("{}.exe", binary_version));
+        } else {
+            base.push(binary_version);
+        }
+        base
+    }
+
+    // Validate helper path construction for both Windows & non-Windows cases.
+    #[test]
+    fn test_build_binary_path() {
+        #[cfg(unix)]
+        {
+            let base_unix = PathBuf::from("/tmp/suiup/binaries/testnet");
+            let p_unix = build_binary_path(base_unix.clone(), "sui-v1.0.0", false);
+            assert!(
+                p_unix
+                    .to_string_lossy()
+                    .ends_with("/tmp/suiup/binaries/testnet/sui-v1.0.0")
+                    || p_unix
+                        .to_string_lossy()
+                        .ends_with("\\tmp\\suiup\\binaries\\testnet\\sui-v1.0.0")
+            );
+        }
+
+        #[cfg(windows)]
+        {
+            let base_win = PathBuf::from("C:/suiup/binaries/testnet");
+            let p_win = build_binary_path(base_win.clone(), "sui-v1.0.0", true);
+            assert!(
+                p_win.to_string_lossy().ends_with("sui-v1.0.0.exe"),
+                "Windows path should end with .exe: {p_win:?}"
+            );
+            // Ensure we did not append an extra plain (non-.exe) component.
+            let components: Vec<_> = p_win.components().collect();
+            let last = components.last().unwrap().as_os_str().to_string_lossy();
+            assert_eq!(last, "sui-v1.0.0.exe");
+        }
+    }
+
+    // Functional test (host-platform specific) verifying existence detection works.
+    #[test]
+    fn test_check_if_binaries_exist_detects_created_file() {
+        // Use a temp dir and point XDG/LOCALAPPDATA to it so binaries_dir() resolves inside it.
+        let temp = tempfile::TempDir::new().unwrap();
+        #[cfg(windows)]
+        let (var, original) = ("LOCALAPPDATA", std::env::var("LOCALAPPDATA").ok());
+        #[cfg(not(windows))]
+        let (var, original) = ("XDG_DATA_HOME", std::env::var("XDG_DATA_HOME").ok());
+        crate::set_env_var!(var, temp.path());
+
+        let mut network_dir = binaries_dir();
+        network_dir.push("testnet");
+        fs::create_dir_all(&network_dir).unwrap();
+
+        let binary_version = "sui-v1.2.3";
+        let mut file_path = network_dir.clone();
+        if cfg!(windows) {
+            file_path.push(format!("{}.exe", binary_version));
+        } else {
+            file_path.push(binary_version);
+        }
+        let mut f = File::create(&file_path).unwrap();
+        writeln!(f, "test").unwrap();
+
+        let exists = check_if_binaries_exist("sui", "testnet".to_string(), "v1.2.3").unwrap();
+        assert!(exists, "Binary should be detected as existing");
+
+        // Restore original environment variable (best effort).
+        if let Some(val) = original {
+            crate::set_env_var!(var, val);
+        } else {
+            crate::remove_env_var!(var);
+        }
+    }
 }

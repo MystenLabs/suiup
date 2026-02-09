@@ -6,10 +6,10 @@ mod tests {
     use anyhow::Result;
     use std::fs;
     use std::time::{Duration, SystemTime};
-    use suiup::commands::{parse_component_with_version, BinaryName, CommandMetadata};
+    use suiup::commands::{BinaryName, CommandMetadata, parse_component_with_version};
     use suiup::handlers::cleanup::handle_cleanup;
-    use suiup::handlers::switch::parse_binary_spec;
     use suiup::paths;
+    use suiup::set_env_var;
     use tempfile::TempDir;
 
     #[test]
@@ -47,10 +47,11 @@ mod tests {
         assert_eq!(expected, result);
 
         let result = parse_component_with_version("random");
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "Invalid binary name: random. Use `suiup list` to find available binaries to install."
+        assert!(
+            result
+                .unwrap_err()
                 .to_string()
+                .contains("Invalid binary name: random")
         );
 
         Ok(())
@@ -63,48 +64,10 @@ mod tests {
         assert_eq!(BinaryName::Walrus.to_string(), "walrus");
     }
 
-    #[test]
-    fn test_parse_binary_spec() -> Result<()> {
-        // Test valid format
-        let result = parse_binary_spec("sui@testnet")?;
-        assert_eq!(result, ("sui".to_string(), "testnet".to_string()));
-
-        let result = parse_binary_spec("mvr@main")?;
-        assert_eq!(result, ("mvr".to_string(), "main".to_string()));
-
-        let result = parse_binary_spec("walrus@devnet")?;
-        assert_eq!(result, ("walrus".to_string(), "devnet".to_string()));
-
-        // Test invalid formats
-        let result = parse_binary_spec("sui");
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid format"));
-
-        let result = parse_binary_spec("sui@");
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Binary name and network/release cannot be empty"));
-
-        let result = parse_binary_spec("@testnet");
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Binary name and network/release cannot be empty"));
-
-        let result = parse_binary_spec("sui@testnet@extra");
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid format"));
-
-        Ok(())
-    }
-
     #[tokio::test]
     async fn test_cleanup_empty_directory() -> Result<()> {
         let temp_dir = TempDir::new()?;
-        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+        set_env_var!("XDG_CACHE_HOME", temp_dir.path());
 
         // Test cleanup on empty directory
         let result = handle_cleanup(false, 30, true).await;
@@ -130,7 +93,9 @@ mod tests {
         let old_time = SystemTime::now() - Duration::from_secs(60 * 60 * 24 * 40); // 40 days ago
         filetime::set_file_mtime(&old_file, filetime::FileTime::from_system_time(old_time))?;
 
-        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+        }
 
         // Dry run should not remove files
         let result = handle_cleanup(false, 30, true).await;
@@ -145,7 +110,9 @@ mod tests {
     async fn test_cleanup_remove_old_files() -> Result<()> {
         let temp_dir = TempDir::new()?;
         // Set up environment variable for cache directory
-        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+        }
         // Create cache directory
         let cache_dir = paths::release_archive_dir();
         fs::create_dir_all(&cache_dir)?;
@@ -161,7 +128,9 @@ mod tests {
         let old_time = SystemTime::now() - Duration::from_secs(60 * 60 * 24 * 40); // 40 days ago
         filetime::set_file_mtime(&old_file, filetime::FileTime::from_system_time(old_time))?;
 
-        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+        }
 
         // Actual cleanup should remove old file but keep new file
         let result = handle_cleanup(false, 30, false).await;
@@ -176,7 +145,9 @@ mod tests {
     async fn test_cleanup_remove_all() -> Result<()> {
         let temp_dir = TempDir::new()?;
         // Set up environment variable for cache directory
-        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+        }
         // Create cache directory
         let cache_dir = paths::release_archive_dir();
         fs::create_dir_all(&cache_dir)?;
@@ -188,7 +159,9 @@ mod tests {
         fs::write(&file1, b"content1")?;
         fs::write(&file2, b"content2")?;
 
-        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+        }
 
         // Remove all should clear everything
         let result = handle_cleanup(true, 30, false).await;

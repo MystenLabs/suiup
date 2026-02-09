@@ -12,7 +12,7 @@ use std::process::Command;
 
 pub async fn run_doctor_checks() -> Result<()> {
     println!("\n{}", "Suiup Environment Doctor".bold());
-    println!("{}", "------------------------");
+    println!("------------------------");
 
     let mut warnings = 0;
     let mut errors = 0;
@@ -95,16 +95,23 @@ fn check_path_variables(check: &mut impl FnMut(&str, Result<String, String>)) {
 
                 // Check PATH order
                 let cargo_bin_dir = dirs::home_dir().map(|p| p.join(".cargo/bin"));
-                if let Some(cargo_bin) = cargo_bin_dir {
-                    if paths.contains(&cargo_bin) {
-                        let suiup_pos = paths.iter().position(|p| p == &default_bin_dir);
-                        let cargo_pos = paths.iter().position(|p| p == &cargo_bin);
-                        if let (Some(s_pos), Some(c_pos)) = (suiup_pos, cargo_pos) {
-                            if s_pos > c_pos {
-                                check("PATH order", Err(format!("WARN: Default binary directory ({}) is after cargo's binary directory ({}). This may cause conflicts if you have also installed sui via `cargo install`.", default_bin_dir.display(), cargo_bin.display())));
-                            } else {
-                                check("PATH order", Ok("is correct".to_string()));
-                            }
+                if let Some(cargo_bin) = cargo_bin_dir
+                    && paths.contains(&cargo_bin)
+                {
+                    let suiup_pos = paths.iter().position(|p| p == &default_bin_dir);
+                    let cargo_pos = paths.iter().position(|p| p == &cargo_bin);
+                    if let (Some(s_pos), Some(c_pos)) = (suiup_pos, cargo_pos) {
+                        if s_pos > c_pos {
+                            check(
+                                "PATH order",
+                                Err(format!(
+                                    "WARN: Default binary directory ({}) is after cargo's binary directory ({}). This may cause conflicts if you have also installed sui via `cargo install`.",
+                                    default_bin_dir.display(),
+                                    cargo_bin.display()
+                                )),
+                            );
+                        } else {
+                            check("PATH order", Ok("is correct".to_string()));
                         }
                     }
                 }
@@ -239,6 +246,8 @@ async fn check_network_connectivity(check: &mut impl FnMut(&str, Result<String, 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::remove_env_var;
+    use crate::set_env_var;
     use std::fs;
     use tempfile::TempDir;
 
@@ -253,12 +262,12 @@ mod tests {
         #[cfg(windows)]
         {
             original_data_home = std::env::var("LOCALAPPDATA");
-            std::env::set_var("LOCALAPPDATA", data_dir.to_str().unwrap());
+            set_env_var!("LOCALAPPDATA", data_dir.to_str().unwrap());
         }
         #[cfg(not(windows))]
         {
             original_data_home = std::env::var("XDG_DATA_HOME");
-            std::env::set_var("XDG_DATA_HOME", data_dir.to_str().unwrap());
+            set_env_var!("XDG_DATA_HOME", data_dir.to_str().unwrap());
         }
 
         let result = check_suiup_data_dir();
@@ -269,17 +278,17 @@ mod tests {
         #[cfg(windows)]
         {
             if let Ok(val) = original_data_home {
-                std::env::set_var("LOCALAPPDATA", val);
+                set_env_var!("LOCALAPPDATA", val);
             } else {
-                std::env::remove_var("LOCALAPPDATA");
+                remove_env_var!("LOCALAPPDATA");
             }
         }
         #[cfg(not(windows))]
         {
             if let Ok(val) = original_data_home {
-                std::env::set_var("XDG_DATA_HOME", val);
+                set_env_var!("XDG_DATA_HOME", val);
             } else {
-                std::env::remove_var("XDG_DATA_HOME");
+                remove_env_var!("XDG_DATA_HOME");
             }
         }
     }
@@ -294,12 +303,12 @@ mod tests {
         #[cfg(windows)]
         {
             original_data_home = std::env::var("LOCALAPPDATA");
-            std::env::set_var("LOCALAPPDATA", data_dir.to_str().unwrap());
+            set_env_var!("LOCALAPPDATA", data_dir.to_str().unwrap());
         }
         #[cfg(not(windows))]
         {
             original_data_home = std::env::var("XDG_DATA_HOME");
-            std::env::set_var("XDG_DATA_HOME", data_dir.to_str().unwrap());
+            set_env_var!("XDG_DATA_HOME", data_dir.to_str().unwrap());
         }
 
         let path = crate::paths::get_suiup_data_dir();
@@ -307,25 +316,27 @@ mod tests {
         println!("Path exists: {}", path.exists());
         let result = check_suiup_data_dir();
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .contains("suiup data directory not found"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("suiup data directory not found")
+        );
 
         // Restore original env var
         #[cfg(windows)]
         {
             if let Ok(val) = original_data_home {
-                std::env::set_var("LOCALAPPDATA", val);
+                set_env_var!("LOCALAPPDATA", val);
             } else {
-                std::env::remove_var("LOCALAPPDATA");
+                remove_env_var!("LOCALAPPDATA");
             }
         }
         #[cfg(not(windows))]
         {
             if let Ok(val) = original_data_home {
-                std::env::set_var("XDG_DATA_HOME", val);
+                set_env_var!("XDG_DATA_HOME", val);
             } else {
-                std::env::remove_var("XDG_DATA_HOME");
+                remove_env_var!("XDG_DATA_HOME");
             }
         }
     }

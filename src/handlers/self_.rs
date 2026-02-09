@@ -4,7 +4,7 @@
 use super::download::detect_os_arch;
 
 use crate::handlers::download::download_file;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::{fmt::Display, process::Command};
 use tokio::task;
 
@@ -12,6 +12,7 @@ use flate2::read::GzDecoder;
 use serde::Deserialize;
 use std::fs::File;
 use tar::Archive;
+use zip::ZipArchive;
 
 #[derive(Debug, Deserialize)]
 struct GitHubRelease {
@@ -53,11 +54,23 @@ async fn get_latest_version() -> Result<Ver> {
         .send()
         .await?;
 
-    if !response.status().is_success() {
-        return Err(anyhow!("Failed to fetch latest version from GitHub"));
+    let status = response.status();
+    if !status.is_success() {
+        let body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unable to read response body".to_string());
+        return Err(anyhow!(
+            "Failed to fetch latest version from GitHub (status {}): {}",
+            status,
+            body
+        ));
     }
 
-    let release: GitHubRelease = response.json().await?;
+    let release: GitHubRelease = response
+        .json()
+        .await
+        .map_err(|e| anyhow!("Failed to parse GitHub release response: {}", e))?;
     Ver::from_str(&release.tag_name)
 }
 
@@ -150,16 +163,42 @@ pub async fn handle_update() -> Result<()> {
 
     let temp_dir = tempfile::tempdir()?;
     let archive_path = temp_dir.path().join(&archive_name);
-    download_file(&url, &temp_dir.path().join(archive_name), "suiup", None).await?;
+    download_file(&url, &temp_dir.path().join(&archive_name), "suiup", None).await?;
 
-    // extract the archive
-    let file = File::open(archive_path.as_path())
-        .map_err(|_| anyhow!("Cannot open archive file: {}", archive_path.display()))?;
-    let tar = GzDecoder::new(file);
-    let mut archive = Archive::new(tar);
-    archive
-        .unpack(temp_dir.path())
-        .map_err(|_| anyhow!("Cannot unpack archive file: {}", archive_path.display()))?;
+    // extract the archive based on file extension
+    if archive_name.ends_with(".zip") {
+        // Handle ZIP extraction
+        let file = File::open(archive_path.as_path())
+            .map_err(|_| anyhow!("Cannot open archive file: {}", archive_path.display()))?;
+        let mut archive = ZipArchive::new(file)
+            .map_err(|_| anyhow!("Cannot read zip archive: {}", archive_path.display()))?;
+
+        for i in 0..archive.len() {
+            let mut file = archive
+                .by_index(i)
+                .map_err(|_| anyhow!("Cannot read file from zip archive"))?;
+            let outpath = temp_dir.path().join(file.name());
+
+            if file.is_dir() {
+                std::fs::create_dir_all(&outpath)?;
+            } else {
+                if let Some(parent) = outpath.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                let mut outfile = File::create(&outpath)?;
+                std::io::copy(&mut file, &mut outfile)?;
+            }
+        }
+    } else {
+        // Handle tar.gz extraction
+        let file = File::open(archive_path.as_path())
+            .map_err(|_| anyhow!("Cannot open archive file: {}", archive_path.display()))?;
+        let tar = GzDecoder::new(file);
+        let mut archive = Archive::new(tar);
+        archive
+            .unpack(temp_dir.path())
+            .map_err(|_| anyhow!("Cannot unpack archive file: {}", archive_path.display()))?;
+    }
 
     #[cfg(not(windows))]
     let binary = "suiup";
@@ -191,6 +230,7 @@ fn find_archive_name() -> Result<String> {
     let (os, arch) = detect_os_arch()?;
 
     let os = match os.as_str() {
+        "ubuntu" => "Linux-musl",
         "linux" => "Linux-musl",
         "windows" => "Windows",
         "macos" => "macOS",
@@ -203,11 +243,10 @@ fn find_archive_name() -> Result<String> {
         _ => &arch,
     };
 
-    let filename = if os == "Windows" && arch == "arm64" {
-        "suiup-Windows-msvc-arm64.zip".to_string()
-    } else {
-        format!("suiup-{os}-{arch}.tar.gz")
-    };
+    #[cfg(not(target_os = "windows"))]
+    let filename = format!("suiup-{os}-{arch}.tar.gz");
+    #[cfg(target_os = "windows")]
+    let filename = format!("suiup-{os}-msvc-{arch}.zip");
 
     Ok(filename)
 }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod get;
-mod set;
+pub mod set;
 
 use anyhow::Result;
 use clap::{Args, Subcommand};

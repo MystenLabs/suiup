@@ -4,7 +4,7 @@
 use anyhow::Error;
 use std::collections::BTreeMap;
 use std::env;
-use std::fs::{create_dir_all, File};
+use std::fs::{File, create_dir_all};
 use std::io::Write;
 use std::path::PathBuf;
 

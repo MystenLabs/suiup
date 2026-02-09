@@ -15,7 +15,7 @@ mod which;
 
 use crate::{handlers::self_::check_for_updates, types::BinaryVersion};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use clap::{Parser, Subcommand, ValueEnum};
 use comfy_table::Table;
 pub const TABLE_FORMAT: &str = "  ── ══      ──    ";
@@ -139,6 +139,8 @@ pub enum BinaryName {
     Walrus,
     #[value(name = "site-builder")]
     WalrusSites,
+    #[value(name = "move-analyzer")]
+    MoveAnalyzer,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -164,6 +166,7 @@ impl BinaryName {
             BinaryName::Sui => "sui",
             BinaryName::Walrus => "walrus",
             BinaryName::WalrusSites => "site-builder",
+            BinaryName::MoveAnalyzer => "move-analyzer",
         }
     }
 }
@@ -175,6 +178,7 @@ impl std::fmt::Display for BinaryName {
             BinaryName::Sui => write!(f, "sui"),
             BinaryName::Walrus => write!(f, "walrus"),
             BinaryName::WalrusSites => write!(f, "site-builder"),
+            BinaryName::MoveAnalyzer => write!(f, "move-analyzer"),
         }
     }
 }
@@ -188,6 +192,7 @@ impl std::str::FromStr for BinaryName {
             "mvr" => Ok(BinaryName::Mvr),
             "walrus" => Ok(BinaryName::Walrus),
             "site-builder" => Ok(BinaryName::WalrusSites),
+            "move-analyzer" => Ok(BinaryName::MoveAnalyzer),
             _ => Err(format!("Unknown binary: {}", s)),
         }
     }
@@ -210,7 +215,7 @@ pub fn parse_component_with_version(s: &str) -> Result<CommandMetadata, anyhow::
     match parts.len() {
         1 => {
             let component = BinaryName::from_str(parts[0], true)
-                .map_err(|_| anyhow!("Invalid binary name: {}. Use `suiup list` to find available binaries to install.", parts[0]))?;
+                .map_err(|_| anyhow!("Invalid binary name: {}. Use `suiup list` to find available binaries to install or `suiup show` to see which binaries are already installed.\nWhen specifying versions, use @, e.g.: sui@v1.60.0\n\nMore information in the docs: https://github.com/mystenLabs/suiup?tab=readme-ov-file#switch-between-versions-note-that-default-set-requires-to-specify-a-version", parts[0]))?;
             let (network, version) = parse_version_spec(None)?;
             let component_metadata = CommandMetadata {
                 name: component,
@@ -221,7 +226,12 @@ pub fn parse_component_with_version(s: &str) -> Result<CommandMetadata, anyhow::
         }
         2 => {
             let component = BinaryName::from_str(parts[0], true)
-                .map_err(|_| anyhow!("Invalid binary name: {}. Use `suiup list` to find available binaries to install.", parts[0]))?;
+                .map_err(|_| anyhow!("Invalid binary name: {}. Use `suiup list` to find available binaries to install or `suiup show` to see which binaries are already installed.\nWhen specifying versions, use `@`, e.g.: sui@v1.60.0\n\nMore information in the docs: https://github.com/mystenLabs/suiup?tab=readme-ov-file#switch-between-versions-note-that-default-set-requires-to-specify-a-version", parts[0]))?;
+            if parts[1].is_empty() {
+                bail!(
+                    "Version cannot be empty. Use 'binary' or 'binary@version' (e.g., sui@v1.60.0)"
+                );
+            }
             let (network, version) = parse_version_spec(Some(parts[1].to_string()))?;
             let component_metadata = CommandMetadata {
                 name: component,
@@ -247,15 +257,31 @@ pub fn parse_version_spec(spec: Option<String>) -> Result<(String, Option<String
             } else if spec == "testnet" || spec == "devnet" || spec == "mainnet" {
                 Ok((spec, None))
             } else {
-                // Assume it's a version for testnet
+                // Validate that it looks like a version (starts with 'v' + digit or digit, and contains a dot)
+                let starts_valid = spec
+                    .chars()
+                    .next()
+                    .map(|c| {
+                        c.is_ascii_digit()
+                            || (c == 'v'
+                                && spec.chars().nth(1).is_some_and(|c2| c2.is_ascii_digit()))
+                    })
+                    .unwrap_or(false);
+                let has_dot = spec.contains('.');
+                if !starts_valid || !has_dot {
+                    bail!(
+                        "Invalid version format: '{}'. Expected a version like 'v1.60.0' or '1.60.0', or when applicable, 'testnet', 'devnet', 'mainnet'.",
+                        spec
+                    );
+                }
                 Ok(("testnet".to_string(), Some(spec)))
             }
         }
     }
 }
 
-pub fn print_table(binaries: &Vec<BinaryVersion>) {
-    let mut binaries_vec = binaries.clone();
+pub fn print_table(binaries: &[BinaryVersion]) {
+    let mut binaries_vec = binaries.to_owned();
     // sort by Binary column
     binaries_vec.sort_by_key(|b| b.binary_name.clone());
     let mut table = Table::new();

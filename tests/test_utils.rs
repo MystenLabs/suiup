@@ -8,6 +8,7 @@ use std::{env, sync::Mutex};
 use suiup::paths::{
     get_cache_home, get_config_home, get_data_home, get_default_bin_dir, initialize,
 };
+use suiup::set_env_var;
 use tempfile::TempDir;
 
 #[derive(Debug)]
@@ -88,13 +89,13 @@ impl TestEnv {
 
         // Set test env vars
         #[cfg(windows)]
-        env::set_var("LOCALAPPDATA", &data_dir); // it is the same for data and config
+        set_env_var!("LOCALAPPDATA", &data_dir); // it is the same for data and config
         #[cfg(not(windows))]
-        env::set_var("XDG_DATA_HOME", &data_dir);
+        set_env_var!("XDG_DATA_HOME", &data_dir);
         #[cfg(not(windows))]
-        env::set_var("XDG_CONFIG_HOME", &config_dir);
+        set_env_var!("XDG_CONFIG_HOME", &config_dir);
         #[cfg(not(windows))]
-        env::set_var("XDG_CACHE_HOME", &cache_dir);
+        set_env_var!("XDG_CACHE_HOME", &cache_dir);
 
         // Add bin dir to PATH
         let path = env::var("PATH").unwrap_or_default();
@@ -102,7 +103,7 @@ impl TestEnv {
         let new_path = format!("{};{}", bin_dir.display(), path);
         #[cfg(not(windows))]
         let new_path = format!("{}:{}", bin_dir.display(), path);
-        env::set_var("PATH", new_path);
+        set_env_var!("PATH", new_path);
 
         Ok(Self {
             temp_dir,
@@ -171,7 +172,7 @@ impl Drop for TestEnv {
     fn drop(&mut self) {
         // Restore original env vars
         for (var, val) in &self.original_env {
-            env::set_var(var, val);
+            set_env_var!(var, val);
         }
     }
 }

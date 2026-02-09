@@ -7,13 +7,13 @@ use crate::handlers::release::{
 use crate::handlers::version::extract_version_from_release;
 use crate::types::Repo;
 use crate::{handlers::release::release_list, paths::release_archive_dir, types::Release};
-use anyhow::{anyhow, bail, Error};
+use anyhow::{Error, anyhow, bail};
 use futures_util::StreamExt;
 use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
 use md5::Context;
 use reqwest::{
-    header::{HeaderMap, HeaderValue, USER_AGENT},
     Client,
+    header::{HeaderMap, HeaderValue, USER_AGENT},
 };
 use std::fs::File;
 use std::io::Read;
@@ -100,7 +100,7 @@ pub fn detect_os_arch() -> Result<(String, String), Error> {
     let os = match whoami::platform() {
         whoami::Platform::Linux => "ubuntu",
         whoami::Platform::Windows => "windows",
-        whoami::Platform::MacOS => "macos",
+        whoami::Platform::Mac => "macos",
         _ => bail!("Unsupported OS. Supported only: Linux, Windows, MacOS"),
     };
     let arch = match std::env::consts::ARCH {
@@ -163,7 +163,10 @@ pub async fn download_release_at_version(
             ));
         }
 
-        let release: Release = response.json().await?;
+        let release: Release = response
+            .json()
+            .await
+            .map_err(|e| anyhow!("Failed to parse GitHub release response: {}", e))?;
         download_asset_from_github(&release, &os, &arch, github_token).await
     }
 }
@@ -204,24 +207,21 @@ pub async fn download_file(
     let mut request = client.get(url).header("User-Agent", "suiup");
 
     // Add authorization header if token is provided and the URL is from GitHub
-    if let Some(token) = github_token {
-        if url.contains("github.com") {
-            request = request.header("Authorization", format!("token {}", token));
-        }
+    if let Some(token) = github_token
+        && url.contains("github.com")
+    {
+        request = request.header("Authorization", format!("token {}", token));
     }
 
     let response = request.send().await?;
 
-    let response = response.error_for_status();
-
-    if let Err(ref e) = response {
-        bail!("Encountered unexpected error: {e}");
-    }
-
-    let response = response.unwrap();
-
-    if !response.status().is_success() {
-        return Err(anyhow!("Failed to download: {}", response.status()));
+    let status = response.status();
+    if !status.is_success() {
+        let body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unable to read response body".to_string());
+        bail!("Failed to download (status {}): {}", status, body);
     }
 
     let mut total_size = response.content_length().unwrap_or(0);

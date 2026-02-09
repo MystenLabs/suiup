@@ -39,6 +39,12 @@ mod tests {
             .env(CONFIG_HOME, &test_env.config_dir)
             .env(CACHE_HOME, &test_env.cache_dir)
             .env(HOME, test_env.temp_dir.path());
+
+        // Pass through GITHUB_TOKEN if set
+        if let Ok(token) = std::env::var("GITHUB_TOKEN") {
+            cmd.env("GITHUB_TOKEN", token);
+        }
+
         cmd
     }
 
@@ -394,9 +400,9 @@ mod tests {
 
         // Test switch with non-existent binary (should fail gracefully)
         let mut cmd = suiup_command(vec!["switch", "sui@testnet"], &test_env);
-        cmd.assert()
-            .failure()
-            .stderr(predicate::str::contains("No installed binary found"));
+        cmd.assert().failure().stderr(predicate::str::contains(
+            "No binaries installed for testnet",
+        ));
 
         Ok(())
     }
@@ -406,23 +412,17 @@ mod tests {
         let test_env = TestEnv::new()?;
         test_env.initialize_paths()?;
 
-        // Test invalid format (missing @)
-        let mut cmd = suiup_command(vec!["switch", "sui"], &test_env);
-        cmd.assert()
-            .failure()
-            .stderr(predicate::str::contains("Invalid format"));
-
         // Test invalid format (empty parts)
         let mut cmd = suiup_command(vec!["switch", "sui@"], &test_env);
         cmd.assert().failure().stderr(predicate::str::contains(
-            "Binary name and network/release cannot be empty",
+            "Version cannot be empty. Use 'binary' or 'binary@version' (e.g., sui@v1.60.0)",
         ));
 
         // Test non-existent binary
         let mut cmd = suiup_command(vec!["switch", "sui@nonexistent"], &test_env);
         cmd.assert()
             .failure()
-            .stderr(predicate::str::contains("No installed binary found"));
+            .stderr(predicate::str::contains("Invalid version format: 'nonexistent'. Expected a version like 'v1.60.0' or '1.60.0', or when applicable, 'testnet', 'devnet', 'mainnet'."));
 
         Ok(())
     }
@@ -489,7 +489,7 @@ mod tests {
         // Use switch command to go back to testnet (should pick latest, which is 1.40.1)
         let mut cmd = suiup_command(vec!["switch", "sui@testnet"], &test_env);
         cmd.assert().success().stdout(predicate::str::contains(
-            "Successfully switched to sui-v1.40.1 from testnet",
+            "Default binary updated to sui@testnet-v1.40.1 version",
         ));
 
         // Verify switch command maintained the default (since it picked the latest)
@@ -526,10 +526,15 @@ mod tests {
     async fn test_cleanup_command_help() -> Result<()> {
         let test_env = TestEnv::new()?;
 
+        let text = if cfg!(windows) {
+            "Usage: suiup.exe cleanup"
+        } else {
+            "Usage: suiup cleanup"
+        };
         let mut cmd = suiup_command(vec!["cleanup", "--help"], &test_env);
         cmd.assert()
             .success()
-            .stdout(predicate::str::contains("Usage: suiup cleanup"))
+            .stdout(predicate::str::contains(text))
             .stdout(predicate::str::contains("--all"))
             .stdout(predicate::str::contains("--days"))
             .stdout(predicate::str::contains("--dry-run"))

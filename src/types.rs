@@ -1,12 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, Error};
-use std::io::Write;
+use crate::fs_utils::{read_json_file, write_json_file};
+use anyhow::{Error, anyhow};
 use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
-    path::PathBuf,
+    path::Path,
     str::FromStr,
 };
 
@@ -102,15 +102,9 @@ pub enum Network {
 }
 
 impl InstalledBinaries {
-    pub fn create_file(path: &PathBuf) -> Result<(), Error> {
+    pub fn create_file(path: &Path) -> Result<(), Error> {
         let binaries = InstalledBinaries { binaries: vec![] };
-        let s = serde_json::to_string_pretty(&binaries)
-            .map_err(|e| anyhow!("Cannot serialize the installed binaries to file: {e}"))?;
-        let mut file = std::fs::File::create(path)
-            .map_err(|e| anyhow!("Cannot create this file {}: {e}", path.display()))?;
-        file.write_all(s.as_bytes())
-            .map_err(|e| anyhow!("Cannot write to {}: {e}", path.display()))?;
-        Ok(())
+        write_json_file(path, &binaries)
     }
 
     pub fn new() -> Result<Self, Error> {
@@ -119,20 +113,12 @@ impl InstalledBinaries {
 
     /// Save the installed binaries data to the installed binaries JSON file
     pub fn save_to_file(&self) -> Result<(), Error> {
-        let s = serde_json::to_string_pretty(self)
-            .map_err(|e| anyhow!("Cannot read the installed binaries file: {e}"))?;
-        std::fs::write(installed_binaries_file()?, s)
-            .map_err(|e| anyhow!("Cannot serialize the installed binaries to file: {e}"))?;
-        Ok(())
+        write_json_file(&installed_binaries_file()?, self)
     }
 
     /// Read the installed binaries JSON file
     pub fn read_from_file() -> Result<Self, Error> {
-        let s = std::fs::read_to_string(installed_binaries_file()?)
-            .map_err(|e| anyhow!("Cannot read from the installed binaries file: {e}"))?;
-        let binaries: InstalledBinaries = serde_json::from_str(&s)
-            .map_err(|e| anyhow!("Cannot deserialize from installed binaries file: {e}"))?;
-        Ok(binaries)
+        read_json_file(&installed_binaries_file()?)
     }
 
     /// Add a binary to the installed binaries JSON file

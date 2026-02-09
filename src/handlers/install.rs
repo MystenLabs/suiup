@@ -12,9 +12,9 @@ use crate::handlers::{extract_component, update_after_install};
 use crate::paths::binaries_dir;
 use crate::standalone;
 use crate::types::{BinaryVersion, InstalledBinaries, Repo};
+use anyhow::Error;
 use anyhow::anyhow;
 use anyhow::bail;
-use anyhow::Error;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::time::Duration;
 
@@ -74,7 +74,9 @@ pub async fn install_from_release(
         let binary_path = binaries_dir().join(network).join(binary_filename);
         install_binary(name, network.to_string(), &version, debug, binary_path, yes)?;
     } else {
-        println!("Binary {name}-{version} already installed. Use `suiup default set` to change the default binary.");
+        println!(
+            "Binary {name}-{version} already installed. Use `suiup default set` to change the default binary."
+        );
     }
     Ok(())
 }
@@ -88,7 +90,8 @@ pub async fn install_from_nightly(
     yes: bool,
 ) -> Result<(), Error> {
     println!("Installing {name} from {branch} branch");
-    check_cargo_rust_installed()?;
+    check_command_installed("rustc")?;
+    check_command_installed("cargo")?;
 
     let pb = ProgressBar::new_spinner();
     pb.set_style(
@@ -146,9 +149,10 @@ pub async fn install_from_nightly(
     let dst = binaries_folder_branch.join("bin").join(dst_name);
 
     #[cfg(windows)]
-    let orig_binary_path = orig_binary_path.with_extension("exe");
+    let orig_binary_path = format!("{}.exe", orig_binary_path.display());
+
     #[cfg(windows)]
-    let dst = dst.with_extension("exe");
+    let dst = PathBuf::from(format!("{}.exe", dst.display()));
 
     std::fs::rename(&orig_binary_path, &dst)?;
     install_binary(
@@ -171,7 +175,7 @@ pub async fn install_standalone(
     let network = "standalone".to_string();
     let binary_name = repo.binary_name();
     if !check_if_binaries_exist(
-        &binary_name,
+        binary_name,
         network.clone(),
         &version.clone().unwrap_or_default(),
     )? {
@@ -184,7 +188,7 @@ pub async fn install_standalone(
             .join(&network)
             .join(format!("{}-{}", binary_name, installed_version));
         install_binary(
-            &binary_name,
+            binary_name,
             network,
             &installed_version,
             false,
@@ -193,38 +197,27 @@ pub async fn install_standalone(
         )?;
     } else {
         let version = version.unwrap_or_default();
-        println!("Binary {binary_name}-{version} already installed. Use `suiup default set {binary_name} {version}` to set the default version to the specified one.");
+        println!(
+            "Binary {binary_name}-{version} already installed. Use `suiup default set {binary_name} {version}` to set the default version to the specified one."
+        );
     }
 
     Ok(())
 }
 
-fn check_cargo_rust_installed() -> Result<(), Error> {
-    if let Ok(output) = Command::new("rustc").arg("--version").output() {
+fn check_command_installed(command: &str) -> Result<(), Error> {
+    if let Ok(output) = Command::new(command).arg("--version").output() {
         if output.status.success() {
             print!(
-                "Rust is installed: {}",
+                "{} is installed: {}",
+                command,
                 String::from_utf8_lossy(&output.stdout)
             );
         } else {
-            bail!("Rust is not installed");
+            bail!("{} is not installed", command);
         }
     } else {
-        bail!("Failed to execute rustc command");
-    }
-
-    // Check if cargo is installed
-    if let Ok(output) = Command::new("cargo").arg("--version").output() {
-        if output.status.success() {
-            print!(
-                "Cargo is installed: {}",
-                String::from_utf8_lossy(&output.stdout)
-            );
-        } else {
-            bail!("Cargo is not installed");
-        }
-    } else {
-        bail!("Failed to execute cargo command");
+        bail!("Failed to execute {} command", command);
     }
     Ok(())
 }

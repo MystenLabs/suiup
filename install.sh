@@ -73,7 +73,7 @@ get_download_url() {
     elif [ "$os" = "linux" ]; then
         echo "${RELEASES_URL}/download/${version}/suiup-Linux-musl-${arch}.tar.gz"
     elif [ "$os" = "windows" ]; then
-        echo "${RELEASES_URL}/download/${version}/suiup-x86_64-pc-windows-msvc"
+        echo "${RELEASES_URL}/download/${version}/suiup-Windows-msvc-${arch}.zip"
     else
         echo ""
     fi
@@ -179,20 +179,24 @@ check_existing_binaries() {
     local os=$2
     local found_binaries=""
     local binary
+    local binary_to_check
 
     # List of binaries to check
-    for binary in sui mvr walrus; do
+    for binary in sui mvr walrus site-builder; do
+        # Add .exe extension for Windows binaries
+        if [ "$os" = "windows" ]; then
+            binary_to_check="${binary}.exe"
+        else
+            binary_to_check="$binary"
+        fi
+
         # Check if binary exists in PATH
-        if command -v "$binary" >/dev/null 2>&1; then
-            # Get the full path of the existing binary
-            existing_path=$(command -v "$binary")
-            # Only warn if it's not in our installation directory
-            if [ "$existing_path" != "$install_dir/$binary" ]; then
-                if [ -n "$found_binaries" ]; then
-                    found_binaries="$found_binaries, $binary"
-                else
-                    found_binaries="$binary"
-                fi
+        if command -v "$binary_to_check" >/dev/null 2>&1; then
+            # Binary exists, add it to the warning list
+            if [ -n "$found_binaries" ]; then
+                found_binaries="$found_binaries, $binary"
+            else
+                found_binaries="$binary"
             fi
         fi
     done
@@ -251,14 +255,18 @@ install_suiup() {
     trap 'rm -rf "$tmp_dir"' EXIT
     
     # Download the binary
-    binary_file="$tmp_dir/suiup.tar.gz"
-    
+    if [ "$os" = "windows" ]; then
+        binary_file="$tmp_dir/suiup.zip"
+    else
+        binary_file="$tmp_dir/suiup.tar.gz"
+    fi
+
     download_file "$download_url" "$binary_file"
-    
+
     # Extract the binary
     printf 'Extracting binary...\n'
     if [ "$os" = "windows" ]; then
-        printf 'No extraction needed for Windows binaries.\n'
+        unzip -q "$binary_file" -d "$tmp_dir"
     else
         tar -xzf "$binary_file" -C "$tmp_dir"
     fi
@@ -274,9 +282,13 @@ install_suiup() {
     
     # Ensure install directory exists
     mkdir -p "$install_dir"
-    
+
     # Move binary to install directory
-    mv "$tmp_dir/suiup" "$installed_path"
+    if [ "$os" = "windows" ]; then
+        mv "$tmp_dir/suiup.exe" "$installed_path"
+    else
+        mv "$tmp_dir/suiup" "$installed_path"
+    fi
     
     printf '%bSuccessfully installed suiup to %s%b\n' "${GREEN}" "$installed_path" "${NC}"
     

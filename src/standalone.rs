@@ -7,7 +7,7 @@ use crate::{
     paths::binaries_dir,
     types::Repo,
 };
-use anyhow::{anyhow, Error};
+use anyhow::{Error, anyhow};
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
@@ -88,7 +88,10 @@ impl StandaloneInstaller {
             cache_folder.join(format!("{}-{}.exe", self.repo.binary_name(), version));
 
         if standalone_binary_path.exists() {
-            println!("Binary {}-{version} already installed. Use `suiup default set standalone {version}` to set the default version to the desired one", self.repo.binary_name());
+            println!(
+                "Binary {}-{version} already installed. Use `suiup default set standalone {version}` to set the default version to the desired one",
+                self.repo.binary_name()
+            );
             return Ok(version);
         }
 
