@@ -26,6 +26,7 @@ pub mod install;
 pub mod release;
 pub mod self_;
 pub mod show;
+pub mod suibase;
 pub mod update;
 pub mod version;
 pub mod which;

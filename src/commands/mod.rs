@@ -9,6 +9,7 @@ mod list;
 mod remove;
 mod self_;
 mod show;
+mod suibase;
 mod switch;
 mod update;
 mod which;
@@ -45,6 +46,7 @@ pub enum Commands {
 
     #[command(name = "self")]
     Self_(self_::Command),
+    Suibase(suibase::Command),
 
     Show(show::Command),
     Switch(switch::Command),
@@ -67,6 +69,7 @@ impl Command {
             Commands::Remove(cmd) => cmd.exec(&self.github_token).await,
             Commands::List(cmd) => cmd.exec(&self.github_token).await,
             Commands::Self_(cmd) => cmd.exec().await,
+            Commands::Suibase(cmd) => cmd.exec().await,
             Commands::Show(cmd) => cmd.exec(),
             Commands::Switch(cmd) => cmd.exec(),
             Commands::Update(cmd) => cmd.exec(&self.github_token).await,

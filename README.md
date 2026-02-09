@@ -189,6 +189,30 @@ You can use the `doctor` command to check for common environment issues.
 suiup doctor
 ```
 
+### Manage suibase
+
+Use dedicated suibase commands (Linux/macOS/WSL2):
+
+```bash
+suiup suibase install
+suiup suibase update
+suiup suibase uninstall
+suiup suibase doctor
+```
+
+Useful flags and config:
+
+```bash
+# Preview commands only
+suiup suibase install --dry-run
+
+# Skip uninstall confirmation
+suiup suibase uninstall --yes
+
+# Use a custom suibase directory (default: ~/suibase)
+SUIUP_SUIBASE_DIR=/path/to/suibase suiup suibase doctor
+```
+
 # Advanced Usage
 
 ### Pre-requisites
