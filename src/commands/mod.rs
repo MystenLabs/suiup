@@ -141,6 +141,10 @@ pub enum BinaryName {
     WalrusSites,
     #[value(name = "move-analyzer")]
     MoveAnalyzer,
+    #[value(name = "ledger-signer")]
+    LedgerSigner,
+    #[value(name = "yubikey-signer")]
+    YubikeySigner,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -156,6 +160,9 @@ impl BinaryName {
             BinaryName::Mvr => "https://github.com/MystenLabs/mvr",
             BinaryName::Walrus => "https://github.com/MystenLabs/walrus",
             BinaryName::WalrusSites => "https://github.com/MystenLabs/walrus-sites",
+            BinaryName::LedgerSigner | BinaryName::YubikeySigner => {
+                "https://github.com/MystenLabs/rust-signers"
+            }
             _ => "https://github.com/MystenLabs/sui",
         }
     }
@@ -167,6 +174,8 @@ impl BinaryName {
             BinaryName::Walrus => "walrus",
             BinaryName::WalrusSites => "site-builder",
             BinaryName::MoveAnalyzer => "move-analyzer",
+            BinaryName::LedgerSigner => "ledger-signer",
+            BinaryName::YubikeySigner => "yubikey-signer",
         }
     }
 }
@@ -179,6 +188,8 @@ impl std::fmt::Display for BinaryName {
             BinaryName::Walrus => write!(f, "walrus"),
             BinaryName::WalrusSites => write!(f, "site-builder"),
             BinaryName::MoveAnalyzer => write!(f, "move-analyzer"),
+            BinaryName::LedgerSigner => write!(f, "ledger-signer"),
+            BinaryName::YubikeySigner => write!(f, "yubikey-signer"),
         }
     }
 }
@@ -193,6 +204,8 @@ impl std::str::FromStr for BinaryName {
             "walrus" => Ok(BinaryName::Walrus),
             "site-builder" => Ok(BinaryName::WalrusSites),
             "move-analyzer" => Ok(BinaryName::MoveAnalyzer),
+            "ledger-signer" => Ok(BinaryName::LedgerSigner),
+            "yubikey-signer" => Ok(BinaryName::YubikeySigner),
             _ => Err(format!("Unknown binary: {}", s)),
         }
     }
