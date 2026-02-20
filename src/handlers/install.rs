@@ -192,7 +192,6 @@ pub async fn install_standalone(
         Some(b) => b.to_str().to_string(),
         None => repo.binary_name().to_string(),
     };
-    let mut installed_binaries_list = Vec::new();
 
     if !check_if_binaries_exist(
         &binary_name,
@@ -221,7 +220,6 @@ pub async fn install_standalone(
             binary_path,
             yes,
         )?;
-        installed_binaries_list.push(binary_name);
     } else {
         let version = version.unwrap_or_default();
         println!(
