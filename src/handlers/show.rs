@@ -6,15 +6,23 @@ use crate::{
     paths::default_file_path,
     types::{Binaries, BinaryVersion, Version},
 };
-use anyhow::Error;
+use anyhow::{Context, Error, anyhow};
 use std::collections::BTreeMap;
 
 use crate::commands::print_table;
 
 /// Load default binaries from configuration file
 fn load_default_binaries() -> Result<Binaries, Error> {
-    let default = std::fs::read_to_string(default_file_path()?)?;
-    let default: BTreeMap<String, (String, Version, bool)> = serde_json::from_str(&default)?;
+    let default_path = default_file_path()?;
+    let default = std::fs::read_to_string(&default_path)
+        .with_context(|| format!("Cannot read default file {}", default_path.display()))?;
+    let default: BTreeMap<String, (String, Version, bool)> = serde_json::from_str(&default)
+        .map_err(|e| {
+            anyhow!(
+                "Cannot deserialize default file {}: {e}",
+                default_path.display()
+            )
+        })?;
     Ok(Binaries::from(default))
 }
 

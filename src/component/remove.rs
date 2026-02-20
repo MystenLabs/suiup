@@ -4,7 +4,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result};
 use tracing::debug;
 
 use crate::commands::BinaryName;
@@ -49,7 +49,7 @@ pub async fn remove_component(binary: BinaryName) -> Result<()> {
         if let Some(p) = binary.path.as_ref() {
             println!("Found binary path: {p}");
             debug!("Removing binary: {p}");
-            std::fs::remove_file(p).map_err(|e| anyhow!("Cannot remove file: {e}"))?;
+            std::fs::remove_file(p).with_context(|| format!("Cannot remove file {}", p))?;
             debug!("File removed: {p}");
             println!("Removed binary: {} from {p}", binary.binary_name);
         }
@@ -65,7 +65,7 @@ pub async fn remove_component(binary: BinaryName) -> Result<()> {
         let default_bin_path = get_default_bin_dir().join(binary);
         if default_bin_path.exists() {
             std::fs::remove_file(&default_bin_path)
-                .map_err(|e| anyhow!("Cannot remove file: {e}"))?;
+                .with_context(|| format!("Cannot remove file {}", default_bin_path.display()))?;
             debug!(
                 "Removed {} from default binaries folder",
                 default_bin_path.display()

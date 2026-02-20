@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use std::fs::create_dir_all;
 
 use crate::commands::BinaryName;
@@ -21,10 +21,20 @@ pub async fn install_component(
 ) -> Result<()> {
     // Ensure installation directories exist
     let default_bin_dir = get_default_bin_dir();
-    create_dir_all(&default_bin_dir)?;
+    create_dir_all(&default_bin_dir).with_context(|| {
+        format!(
+            "Cannot create default bin directory {}",
+            default_bin_dir.display()
+        )
+    })?;
 
     let installed_bins_dir = binaries_dir();
-    create_dir_all(&installed_bins_dir)?;
+    create_dir_all(&installed_bins_dir).with_context(|| {
+        format!(
+            "Cannot create installed binaries directory {}",
+            installed_bins_dir.display()
+        )
+    })?;
 
     if name != BinaryName::Sui && debug && nightly.is_none() {
         return Err(anyhow!("Debug flag is only available for the `sui` binary"));
@@ -38,7 +48,9 @@ pub async fn install_component(
 
     match (&name, &nightly) {
         (BinaryName::Walrus, nightly) => {
-            create_dir_all(installed_bins_dir.join(network.clone()))?;
+            let walrus_dir = installed_bins_dir.join(network.clone());
+            create_dir_all(&walrus_dir)
+                .with_context(|| format!("Cannot create directory {}", walrus_dir.display()))?;
             if let Some(branch) = nightly {
                 install_from_nightly(&name, branch, debug, yes).await?;
             } else {
@@ -55,7 +67,9 @@ pub async fn install_component(
             }
         }
         (BinaryName::WalrusSites, nightly) => {
-            create_dir_all(installed_bins_dir.join("mainnet"))?;
+            let mainnet_dir = installed_bins_dir.join("mainnet");
+            create_dir_all(&mainnet_dir)
+                .with_context(|| format!("Cannot create directory {}", mainnet_dir.display()))?;
             if let Some(branch) = nightly {
                 install_from_nightly(&name, branch, debug, yes).await?;
             } else {
@@ -72,7 +86,9 @@ pub async fn install_component(
             }
         }
         (BinaryName::Mvr, nightly) => {
-            create_dir_all(installed_bins_dir.join("standalone"))?;
+            let standalone_dir = installed_bins_dir.join("standalone");
+            create_dir_all(&standalone_dir)
+                .with_context(|| format!("Cannot create directory {}", standalone_dir.display()))?;
             if let Some(branch) = nightly {
                 install_from_nightly(&name, branch, debug, yes).await?;
             } else {
@@ -85,6 +101,7 @@ pub async fn install_component(
                         }
                     },
                     yes,
+                    github_token,
                 )
                 .await?;
             }

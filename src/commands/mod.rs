@@ -54,24 +54,34 @@ pub enum Commands {
 }
 
 impl Command {
+    fn normalized_github_token(&self) -> Option<String> {
+        self.github_token
+            .as_deref()
+            .map(str::trim)
+            .filter(|token| !token.is_empty())
+            .map(ToOwned::to_owned)
+    }
+
     pub async fn exec(&self) -> Result<()> {
         // Check for updates before executing any command (except self update to avoid recursion)
         if !matches!(self.command, Commands::Self_(_)) && !self.disable_update_warnings {
             check_for_updates();
         }
 
+        let github_token = self.normalized_github_token();
+
         match &self.command {
             Commands::Default(cmd) => cmd.exec(),
-            Commands::Doctor(cmd) => cmd.exec(&self.github_token).await,
-            Commands::Install(cmd) => cmd.exec(&self.github_token).await,
-            Commands::Remove(cmd) => cmd.exec(&self.github_token).await,
-            Commands::List(cmd) => cmd.exec(&self.github_token).await,
+            Commands::Doctor(cmd) => cmd.exec(&github_token).await,
+            Commands::Install(cmd) => cmd.exec(&github_token).await,
+            Commands::Remove(cmd) => cmd.exec(&github_token).await,
+            Commands::List(cmd) => cmd.exec(&github_token).await,
             Commands::Self_(cmd) => cmd.exec().await,
             Commands::Show(cmd) => cmd.exec(),
             Commands::Switch(cmd) => cmd.exec(),
-            Commands::Update(cmd) => cmd.exec(&self.github_token).await,
+            Commands::Update(cmd) => cmd.exec(&github_token).await,
             Commands::Which(cmd) => cmd.exec(),
-            Commands::Cleanup(cmd) => cmd.exec(&self.github_token).await,
+            Commands::Cleanup(cmd) => cmd.exec(&github_token).await,
         }
     }
 }
@@ -311,9 +321,22 @@ pub fn print_table(binaries: &[BinaryVersion]) {
 #[cfg(test)]
 mod tests {
     use clap::CommandFactory;
+    use clap::Parser;
 
     #[test]
     fn verify_command() {
         super::Command::command().debug_assert();
+    }
+
+    #[test]
+    fn normalize_empty_github_token_to_none() {
+        let cmd = super::Command::parse_from(["suiup", "--github-token", "", "list"]);
+        assert_eq!(cmd.normalized_github_token(), None);
+    }
+
+    #[test]
+    fn preserve_non_empty_github_token() {
+        let cmd = super::Command::parse_from(["suiup", "--github-token", "abc123", "list"]);
+        assert_eq!(cmd.normalized_github_token(), Some("abc123".to_string()));
     }
 }

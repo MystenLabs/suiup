@@ -7,8 +7,9 @@ use crate::{
     paths::binaries_dir,
     types::Repo,
 };
-use anyhow::{Error, anyhow};
+use anyhow::{Context, Error, anyhow};
 use serde::Deserialize;
+use serde::de::DeserializeOwned;
 
 #[derive(Deserialize, Debug)]
 pub struct StandaloneRelease {
@@ -25,13 +26,15 @@ pub struct StandaloneAsset {
 pub struct StandaloneInstaller {
     releases: Vec<StandaloneRelease>,
     repo: Repo,
+    github_token: Option<String>,
 }
 
 impl StandaloneInstaller {
-    pub fn new(repo: Repo) -> Self {
+    pub fn new(repo: Repo, github_token: Option<String>) -> Self {
         Self {
             releases: Vec::new(),
             repo,
+            github_token,
         }
     }
 
@@ -43,13 +46,32 @@ impl StandaloneInstaller {
             return Ok(());
         }
 
-        let releases: Vec<StandaloneRelease> = client
-            .get(&url)
-            .header("User-Agent", "suiup")
+        let mut request = client.get(&url).header("User-Agent", "suiup");
+        if let Some(token) = &self.github_token {
+            request = request.header("Authorization", format!("token {}", token));
+        }
+
+        let response = request
             .send()
-            .await?
-            .json()
-            .await?;
+            .await
+            .with_context(|| format!("Failed to send request to {url}"))?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("Unable to read response body: {e}"));
+            return Err(anyhow!(
+                "GitHub API request failed with status {} for {}: {}",
+                status,
+                url,
+                body
+            ));
+        }
+
+        let releases: Vec<StandaloneRelease> =
+            parse_json_response(response, &url, "GitHub releases list").await?;
         self.releases = releases;
         Ok(())
     }
@@ -78,7 +100,9 @@ impl StandaloneInstaller {
 
         let cache_folder = binaries_dir().join("standalone");
         if !cache_folder.exists() {
-            std::fs::create_dir_all(&cache_folder)?;
+            std::fs::create_dir_all(&cache_folder).with_context(|| {
+                format!("Cannot create cache directory {}", cache_folder.display())
+            })?;
         }
         #[cfg(not(windows))]
         let standalone_binary_path =
@@ -127,18 +151,62 @@ impl StandaloneInstaller {
             &asset.browser_download_url,
             &standalone_binary_path,
             format!("{}-{version}", self.repo.binary_name()).as_str(),
-            None,
+            self.github_token.clone(),
         )
         .await?;
 
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let mut perms = std::fs::metadata(&standalone_binary_path)?.permissions();
+            let mut perms = std::fs::metadata(&standalone_binary_path)
+                .with_context(|| {
+                    format!(
+                        "Cannot read metadata for binary {}",
+                        standalone_binary_path.display()
+                    )
+                })?
+                .permissions();
             perms.set_mode(0o755);
-            std::fs::set_permissions(&standalone_binary_path, perms)?;
+            std::fs::set_permissions(&standalone_binary_path, perms).with_context(|| {
+                format!(
+                    "Cannot set executable permissions on {}",
+                    standalone_binary_path.display()
+                )
+            })?;
         }
 
         Ok(version)
+    }
+}
+
+async fn parse_json_response<T>(
+    response: reqwest::Response,
+    request_url: &str,
+    response_name: &str,
+) -> Result<T, Error>
+where
+    T: DeserializeOwned,
+{
+    let response_body = response
+        .text()
+        .await
+        .with_context(|| format!("Cannot read {response_name} response body from {request_url}"))?;
+
+    serde_json::from_str(&response_body).map_err(|e| {
+        anyhow!(
+            "Failed to deserialize {response_name} response from {request_url}: {e}\nResponse body:\n{response_body}"
+        )
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::StandaloneInstaller;
+    use crate::types::Repo;
+
+    #[test]
+    fn standalone_installer_stores_github_token() {
+        let installer = StandaloneInstaller::new(Repo::Mvr, Some("token123".to_string()));
+        assert_eq!(installer.github_token.as_deref(), Some("token123"));
     }
 }

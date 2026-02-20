@@ -7,14 +7,15 @@ use crate::handlers::release::{
 use crate::handlers::version::extract_version_from_release;
 use crate::types::Repo;
 use crate::{handlers::release::release_list, paths::release_archive_dir, types::Release};
-use anyhow::{Error, anyhow, bail};
+use anyhow::{Context, Error, anyhow, bail};
 use futures_util::StreamExt;
 use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
-use md5::Context;
+use md5::Context as Md5Context;
 use reqwest::{
     Client,
     header::{HeaderMap, HeaderValue, USER_AGENT},
 };
+use serde::de::DeserializeOwned;
 use std::fs::File;
 use std::io::Read;
 use std::{cmp::min, io::Write, path::PathBuf, time::Instant};
@@ -145,14 +146,18 @@ pub async fn download_release_at_version(
 
         // Add authorization header if token is provided
         if let Some(token) = &github_token {
-            headers.insert(
-                "Authorization",
-                HeaderValue::from_str(&format!("token {}", token)).unwrap(),
-            );
+            let auth_header = HeaderValue::from_str(&format!("token {}", token))
+                .map_err(|e| anyhow!("Invalid GitHub token for Authorization header: {e}"))?;
+            headers.insert("Authorization", auth_header);
         }
 
         let url = format!("https://api.github.com/repos/{repo}/releases/tags/{}", tag);
-        let response = client.get(&url).headers(headers).send().await?;
+        let response = client
+            .get(&url)
+            .headers(headers)
+            .send()
+            .await
+            .with_context(|| format!("Failed to send request to {url}"))?;
 
         if !response.status().is_success() {
             return Err(generate_network_suggestions_error(
@@ -163,10 +168,7 @@ pub async fn download_release_at_version(
             ));
         }
 
-        let release: Release = response
-            .json()
-            .await
-            .map_err(|e| anyhow!("Failed to parse GitHub release response: {}", e))?;
+        let release: Release = parse_json_response(response, &url, "GitHub release").await?;
         download_asset_from_github(&release, &os, &arch, github_token).await
     }
 }
@@ -213,14 +215,17 @@ pub async fn download_file(
         request = request.header("Authorization", format!("token {}", token));
     }
 
-    let response = request.send().await?;
+    let response = request
+        .send()
+        .await
+        .with_context(|| format!("Failed to send download request to {url}"))?;
 
     let status = response.status();
     if !status.is_success() {
         let body = response
             .text()
             .await
-            .unwrap_or_else(|_| "Unable to read response body".to_string());
+            .unwrap_or_else(|e| format!("Unable to read response body: {e}"));
         bail!("Failed to download (status {}): {}", status, body);
     }
 
@@ -236,15 +241,29 @@ pub async fn download_file(
     }
 
     if download_to.exists() {
-        if download_to.metadata()?.len() == total_size {
+        if download_to
+            .metadata()
+            .with_context(|| {
+                format!(
+                    "Cannot read metadata for existing file {}",
+                    download_to.display()
+                )
+            })?
+            .len()
+            == total_size
+        {
             // Check md5 if .md5 file exists
             let md5_path = download_to.with_extension("md5");
             if md5_path.exists() {
-                let mut file = File::open(download_to)?;
-                let mut hasher = Context::new();
+                let mut file = File::open(download_to).with_context(|| {
+                    format!("Cannot open file for MD5 check {}", download_to.display())
+                })?;
+                let mut hasher = Md5Context::new();
                 let mut buffer = [0u8; 8192];
                 loop {
-                    let n = file.read(&mut buffer)?;
+                    let n = file.read(&mut buffer).with_context(|| {
+                        format!("Cannot read file for MD5 check {}", download_to.display())
+                    })?;
                     if n == 0 {
                         break;
                     }
@@ -252,7 +271,10 @@ pub async fn download_file(
                 }
                 let result = hasher.finalize();
                 let local_md5 = format!("{:x}", result);
-                let expected_md5 = std::fs::read_to_string(md5_path)?.trim().to_string();
+                let expected_md5 = std::fs::read_to_string(&md5_path)
+                    .with_context(|| format!("Cannot read MD5 file {}", md5_path.display()))?
+                    .trim()
+                    .to_string();
                 if local_md5 == expected_md5 {
                     println!("Found {name} in cache, md5 verified");
                     return Ok(name.to_string());
@@ -264,7 +286,12 @@ pub async fn download_file(
                 return Ok(name.to_string());
             }
         }
-        std::fs::remove_file(download_to)?;
+        std::fs::remove_file(download_to).with_context(|| {
+            format!(
+                "Cannot remove stale cached file before re-download {}",
+                download_to.display()
+            )
+        })?;
     }
 
     let pb = ProgressBar::new(total_size);
@@ -273,14 +300,16 @@ pub async fn download_file(
         .unwrap()
         .progress_chars("=>-"));
 
-    let mut file = std::fs::File::create(download_to)?;
+    let mut file = std::fs::File::create(download_to)
+        .with_context(|| format!("Cannot create download file {}", download_to.display()))?;
     let mut downloaded: u64 = 0;
     let mut stream = response.bytes_stream();
     let start = Instant::now();
 
     while let Some(item) = stream.next().await {
         let chunk = item?;
-        file.write_all(&chunk)?;
+        file.write_all(&chunk)
+            .with_context(|| format!("Cannot write to download file {}", download_to.display()))?;
         let new = min(downloaded + (chunk.len() as u64), total_size);
         downloaded = new;
         pb.set_position(new);
@@ -297,11 +326,21 @@ pub async fn download_file(
     // After download, check md5 if .md5 file exists
     let md5_path = download_to.with_extension("md5");
     if md5_path.exists() {
-        let mut file = File::open(download_to)?;
-        let mut hasher = Context::new();
+        let mut file = File::open(download_to).with_context(|| {
+            format!(
+                "Cannot open downloaded file for MD5 check {}",
+                download_to.display()
+            )
+        })?;
+        let mut hasher = Md5Context::new();
         let mut buffer = [0u8; 8192];
         loop {
-            let n = file.read(&mut buffer)?;
+            let n = file.read(&mut buffer).with_context(|| {
+                format!(
+                    "Cannot read downloaded file for MD5 check {}",
+                    download_to.display()
+                )
+            })?;
             if n == 0 {
                 break;
             }
@@ -309,7 +348,10 @@ pub async fn download_file(
         }
         let result = hasher.finalize();
         let local_md5 = format!("{:x}", result);
-        let expected_md5 = std::fs::read_to_string(md5_path)?.trim().to_string();
+        let expected_md5 = std::fs::read_to_string(&md5_path)
+            .with_context(|| format!("Cannot read MD5 file {}", md5_path.display()))?
+            .trim()
+            .to_string();
         if local_md5 != expected_md5 {
             return Err(anyhow!(format!(
                 "MD5 check failed for {}: expected {}, got {}",
@@ -321,6 +363,26 @@ pub async fn download_file(
     }
 
     Ok(name.to_string())
+}
+
+async fn parse_json_response<T>(
+    response: reqwest::Response,
+    request_url: &str,
+    response_name: &str,
+) -> Result<T, anyhow::Error>
+where
+    T: DeserializeOwned,
+{
+    let response_body = response
+        .text()
+        .await
+        .with_context(|| format!("Cannot read {response_name} response body from {request_url}"))?;
+
+    serde_json::from_str(&response_body).map_err(|e| {
+        anyhow!(
+            "Failed to deserialize {response_name} response from {request_url}: {e}\nResponse body:\n{response_body}"
+        )
+    })
 }
 
 /// Downloads the archived release from GitHub and returns the file name
