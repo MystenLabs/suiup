@@ -112,7 +112,7 @@ pub async fn install_component(
             if let Some(branch) = nightly {
                 install_from_nightly(&name, branch, debug, yes).await?;
             } else {
-                install_standalone(version, Repo::Signers, Some(name), yes).await?;
+                install_standalone(version, Repo::Signers, Some(name), yes, github_token).await?;
             }
         }
         (_, Some(branch)) => {
