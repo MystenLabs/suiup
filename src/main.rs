@@ -12,7 +12,7 @@ async fn main() -> anyhow::Result<()> {
 
     let cmd = Command::parse();
     if let Err(err) = cmd.exec().await {
-        eprintln!("Error: {}", err);
+        eprintln!("Error: {err:#}");
         std::process::exit(1);
     }
 

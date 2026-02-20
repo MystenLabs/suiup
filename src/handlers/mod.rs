@@ -3,6 +3,7 @@
 
 use crate::paths::{binaries_dir, get_default_bin_dir, release_archive_dir};
 use crate::{paths::default_file_path, types::Version};
+use anyhow::Context;
 use anyhow::Error;
 use anyhow::anyhow;
 use flate2::read::GzDecoder;
@@ -46,9 +47,16 @@ pub fn update_default_version_file(
     debug: bool,
 ) -> Result<(), Error> {
     let path = default_file_path()?;
-    let file = File::open(&path)?;
+    let file = File::open(&path)
+        .with_context(|| format!("Cannot open default version file {}", path.display()))?;
     let reader = BufReader::new(file);
-    let mut map: BTreeMap<String, (String, Version, bool)> = serde_json::from_reader(reader)?;
+    let mut map: BTreeMap<String, (String, Version, bool)> = serde_json::from_reader(reader)
+        .map_err(|e| {
+            anyhow!(
+                "Cannot deserialize default version file {}: {e}",
+                path.display()
+            )
+        })?;
 
     for binary in binaries {
         let b = map.get_mut(binary);
@@ -64,8 +72,12 @@ pub fn update_default_version_file(
         }
     }
 
-    let mut file = File::create(path)?;
-    file.write_all(serde_json::to_string_pretty(&map)?.as_bytes())?;
+    let mut file = File::create(&path)
+        .with_context(|| format!("Cannot create default version file {}", path.display()))?;
+    let payload =
+        serde_json::to_string_pretty(&map).context("Cannot serialize default version map")?;
+    file.write_all(payload.as_bytes())
+        .with_context(|| format!("Cannot write default version file {}", path.display()))?;
 
     Ok(())
 }
@@ -200,9 +212,15 @@ pub fn update_after_install(
 
                 #[cfg(unix)]
                 {
-                    let mut perms = std::fs::metadata(&dst)?.permissions();
+                    let mut perms = std::fs::metadata(&dst)
+                        .with_context(|| {
+                            format!("Cannot read metadata for default binary {}", dst.display())
+                        })?
+                        .permissions();
                     perms.set_mode(0o755);
-                    std::fs::set_permissions(&dst, perms)?;
+                    std::fs::set_permissions(&dst, perms).with_context(|| {
+                        format!("Cannot set executable permissions on {}", dst.display())
+                    })?;
                 }
 
                 println!("[{network}] {binary}-{version} set as default");
@@ -282,7 +300,7 @@ fn extract_component(orig_binary: &str, network: String, filename: &str) -> Resu
     archive_path.push(filename);
 
     let file = File::open(archive_path.as_path())
-        .map_err(|_| anyhow!("Cannot open archive file: {}", archive_path.display()))?;
+        .with_context(|| format!("Cannot open archive file {}", archive_path.display()))?;
     let tar = GzDecoder::new(file);
     let mut archive = Archive::new(tar);
 
@@ -296,14 +314,27 @@ fn extract_component(orig_binary: &str, network: String, filename: &str) -> Resu
         .entries()
         .map_err(|e| anyhow!("Cannot iterate through archive entries: {e}"))?
     {
-        let mut f = file.unwrap();
-        if f.path()?.file_name().and_then(|x| x.to_str()) == Some(&binary) {
+        let mut f = file.map_err(|e| {
+            anyhow!(
+                "Cannot read entry from archive {}: {e}",
+                archive_path.display()
+            )
+        })?;
+        let entry_path = f.path().map_err(|e| {
+            anyhow!(
+                "Cannot read entry path from archive {}: {e}",
+                archive_path.display()
+            )
+        })?;
+        if entry_path.file_name().and_then(|x| x.to_str()) == Some(&binary) {
             println!("Extracting file: {}", &binary);
 
             let mut output_path = binaries_dir();
             output_path.push(&network);
             if !output_path.is_dir() {
-                std::fs::create_dir_all(output_path.as_path())?;
+                std::fs::create_dir_all(output_path.as_path()).with_context(|| {
+                    format!("Cannot create binaries directory {}", output_path.display())
+                })?;
             }
             let version = extract_version_from_release(filename)?;
             let binary_version = format!("{}-{}", orig_binary, version);
@@ -320,20 +351,24 @@ fn extract_component(orig_binary: &str, network: String, filename: &str) -> Resu
             })?;
 
             std::io::copy(&mut f, &mut output_file).map_err(|e| {
-                anyhow!("Cannot copy the file ({orig_binary}) into the output path: {e}")
+                anyhow!(
+                    "Cannot copy file {} into output path {}: {e}",
+                    orig_binary,
+                    output_path.display()
+                )
             })?;
             println!(" '{}' extracted successfully!", &binary);
             #[cfg(not(target_os = "windows"))]
             {
                 // Retrieve and apply the original file permissions on Unix-like systems
                 if let Ok(permissions) = f.header().mode() {
-                    set_permissions(output_path, PermissionsExt::from_mode(permissions)).map_err(
-                        |e| {
-                            anyhow!(
-                                "Cannot apply the original file permissions in a unix system: {e}"
+                    set_permissions(output_path.clone(), PermissionsExt::from_mode(permissions))
+                        .with_context(|| {
+                            format!(
+                                "Cannot apply original file permissions to {}",
+                                output_path.display()
                             )
-                        },
-                    )?;
+                        })?;
                 }
             }
             break;

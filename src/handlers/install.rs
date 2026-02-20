@@ -12,6 +12,7 @@ use crate::handlers::{extract_component, update_after_install};
 use crate::paths::binaries_dir;
 use crate::standalone;
 use crate::types::{BinaryVersion, InstalledBinaries, Repo};
+use anyhow::Context;
 use anyhow::Error;
 use anyhow::anyhow;
 use anyhow::bail;
@@ -149,12 +150,18 @@ pub async fn install_from_nightly(
     let dst = binaries_folder_branch.join("bin").join(dst_name);
 
     #[cfg(windows)]
-    let orig_binary_path = format!("{}.exe", orig_binary_path.display());
+    let orig_binary_path = PathBuf::from(format!("{}.exe", orig_binary_path.display()));
 
     #[cfg(windows)]
     let dst = PathBuf::from(format!("{}.exe", dst.display()));
 
-    std::fs::rename(&orig_binary_path, &dst)?;
+    std::fs::rename(&orig_binary_path, &dst).with_context(|| {
+        format!(
+            "Cannot rename nightly binary from {} to {}",
+            orig_binary_path.display(),
+            dst.display()
+        )
+    })?;
     install_binary(
         name.to_str(),
         branch.to_string(),
@@ -171,6 +178,7 @@ pub async fn install_standalone(
     version: Option<String>,
     repo: Repo,
     yes: bool,
+    github_token: Option<String>,
 ) -> Result<(), Error> {
     let network = "standalone".to_string();
     let binary_name = repo.binary_name();
@@ -179,7 +187,7 @@ pub async fn install_standalone(
         network.clone(),
         &version.clone().unwrap_or_default(),
     )? {
-        let mut installer = standalone::StandaloneInstaller::new(repo);
+        let mut installer = standalone::StandaloneInstaller::new(repo, github_token);
         let installed_version = installer.download_version(version).await?;
 
         println!("Adding binary: {binary_name}-{installed_version}");

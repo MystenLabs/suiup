@@ -1,11 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Error;
 use anyhow::anyhow;
 use anyhow::bail;
+use anyhow::{Context, Error};
 use reqwest::header::ETAG;
 use reqwest::header::IF_NONE_MATCH;
+use serde::de::DeserializeOwned;
 
 use crate::handlers::version::extract_version_from_release;
 use crate::paths::get_suiup_cache_dir;
@@ -34,7 +35,7 @@ pub async fn release_list(
     let response = request
         .send()
         .await
-        .map_err(|e| anyhow!("Could not send request: {e}"))?;
+        .with_context(|| format!("Failed to send request to {release_url}"))?;
 
     // note this only works with authenticated requests. Should add support for that later.
     if response.status() == reqwest::StatusCode::NOT_MODIFIED {
@@ -57,14 +58,12 @@ pub async fn release_list(
         let body = response
             .text()
             .await
-            .unwrap_or_else(|_| "Unable to read response body".to_string());
+            .unwrap_or_else(|e| format!("Unable to read response body: {e}"));
         bail!("GitHub API request failed with status {}: {}", status, body);
     }
 
-    let releases: Vec<Release> = response
-        .json()
-        .await
-        .map_err(|e| anyhow!("Failed to parse GitHub releases response: {}", e))?;
+    let releases: Vec<Release> =
+        parse_json_response(response, &release_url, "GitHub releases list").await?;
     save_release_list(repo, &releases, etag.clone())?;
 
     Ok((releases, etag))
@@ -77,7 +76,7 @@ fn read_etag_file(repo: &Repo) -> Result<String, anyhow::Error> {
     let etag_file = get_suiup_cache_dir().join(filename);
     if etag_file.exists() {
         std::fs::read_to_string(&etag_file)
-            .map_err(|_| anyhow!("Cannot read from file {}", etag_file.display()))
+            .with_context(|| format!("Cannot read ETag file {}", etag_file.display()))
     } else {
         Ok("".to_string())
     }
@@ -104,23 +103,24 @@ fn save_release_list(
     let etag_filename = format!("etag_{}.txt", repo_name);
     let releases_filename = format!("releases_{}.txt", repo_name);
     let cache_dir = get_suiup_cache_dir();
-    std::fs::create_dir_all(&cache_dir).expect("Could not create cache directory");
+    std::fs::create_dir_all(&cache_dir)
+        .with_context(|| format!("Could not create cache directory {}", cache_dir.display()))?;
 
     let cache_file = cache_dir.join(releases_filename);
     let etag_file = cache_dir.join(etag_filename);
 
-    let cache_content =
-        serde_json::to_string_pretty(releases).expect("Could not serialize releases file: {}");
+    let cache_content = serde_json::to_string_pretty(releases)
+        .context("Could not serialize GitHub releases for cache file")?;
 
-    std::fs::write(&cache_file, cache_content).map_err(|_| {
-        anyhow!(
-            "Could not write cache releases file: {}",
-            cache_file.display(),
+    std::fs::write(&cache_file, cache_content).with_context(|| {
+        format!(
+            "Could not write cache releases file {}",
+            cache_file.display()
         )
     })?;
     if let Some(etag) = etag {
         std::fs::write(&etag_file, etag)
-            .map_err(|_| anyhow!("Could not write ETag file: {}", etag_file.display()))?;
+            .with_context(|| format!("Could not write ETag file {}", etag_file.display()))?;
     }
     Ok(())
 }
@@ -134,23 +134,42 @@ fn load_cached_release_list(repo: &Repo) -> Result<Option<(Vec<Release>, String)
     let etag_file = get_suiup_cache_dir().join(etag_filename);
 
     if cache_file.exists() && etag_file.exists() {
-        let cache_content: Vec<Release> = serde_json::from_str(
-            &std::fs::read_to_string(&cache_file)
-                .map_err(|_| anyhow!("Cannot read from file {}", cache_file.display()))?,
-        )
-        .map_err(|_| {
-            anyhow!(
-                "Cannot deserialize the releases cached file {}",
-                cache_file.display()
-            )
-        })?;
+        let raw_cache_content = std::fs::read_to_string(&cache_file)
+            .with_context(|| format!("Cannot read cache file {}", cache_file.display()))?;
+        let cache_content: Vec<Release> =
+            serde_json::from_str(&raw_cache_content).map_err(|e| {
+                anyhow!(
+                    "Cannot deserialize releases cache file {}: {e}",
+                    cache_file.display()
+                )
+            })?;
         let etag_content = std::fs::read_to_string(&etag_file)
-            .map_err(|_| anyhow!("Cannot read from file {}", etag_file.display()))?;
+            .with_context(|| format!("Cannot read ETag file {}", etag_file.display()))?;
 
         Ok(Some((cache_content, etag_content)))
     } else {
         Ok(None)
     }
+}
+
+async fn parse_json_response<T>(
+    response: reqwest::Response,
+    request_url: &str,
+    response_name: &str,
+) -> Result<T, anyhow::Error>
+where
+    T: DeserializeOwned,
+{
+    let response_body = response
+        .text()
+        .await
+        .with_context(|| format!("Cannot read {response_name} response body from {request_url}"))?;
+
+    serde_json::from_str(&response_body).map_err(|e| {
+        anyhow!(
+            "Failed to deserialize {response_name} response from {request_url}: {e}\nResponse body:\n{response_body}"
+        )
+    })
 }
 
 pub async fn last_release_for_network<'a>(
