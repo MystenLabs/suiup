@@ -85,7 +85,11 @@ impl StandaloneInstaller {
     }
 
     /// Download the CLI binary, if it does not exist in the binary folder.
-    pub async fn download_version(&mut self, version: Option<String>) -> Result<String, Error> {
+    pub async fn download_version(
+        &mut self,
+        version: Option<String>,
+        binary_name_str: &String,
+    ) -> Result<String, Error> {
         let version = if let Some(v) = version {
             // Ensure version has 'v' prefix for GitHub release tags
             crate::handlers::release::ensure_version_prefix(&v)
@@ -105,16 +109,15 @@ impl StandaloneInstaller {
             })?;
         }
         #[cfg(not(windows))]
-        let standalone_binary_path =
-            cache_folder.join(format!("{}-{}", self.repo.binary_name(), version));
+        let standalone_binary_path = cache_folder.join(format!("{}-{}", binary_name_str, version));
         #[cfg(target_os = "windows")]
         let standalone_binary_path =
-            cache_folder.join(format!("{}-{}.exe", self.repo.binary_name(), version));
+            cache_folder.join(format!("{}-{}.exe", binary_name_str, version));
 
         if standalone_binary_path.exists() {
             println!(
                 "Binary {}-{version} already installed. Use `suiup default set standalone {version}` to set the default version to the desired one",
-                self.repo.binary_name()
+                binary_name_str
             );
             return Ok(version);
         }
@@ -130,7 +133,7 @@ impl StandaloneInstaller {
             .ok_or_else(|| anyhow!("Version {} not found", version))?;
 
         let (os, arch) = detect_os_arch()?;
-        let asset_name = format!("{}-{}-{}", self.repo.binary_name(), os, arch);
+        let asset_name = format!("{}-{}-{}", binary_name_str, os, arch);
 
         #[cfg(target_os = "windows")]
         let asset_name = format!("{}.exe", asset_name);
@@ -150,7 +153,7 @@ impl StandaloneInstaller {
         download_file(
             &asset.browser_download_url,
             &standalone_binary_path,
-            format!("{}-{version}", self.repo.binary_name()).as_str(),
+            format!("{}-{version}", binary_name_str).as_str(),
             self.github_token.clone(),
         )
         .await?;
