@@ -158,7 +158,9 @@ mod tests {
             .data_dir
             .join("suiup/binaries/testnet/sui-node-v1.39.3.exe");
         #[cfg(not(windows))]
-        let binary_path = test_env.data_dir.join("suiup/binaries/testnet/sui-node-v1.39.3");
+        let binary_path = test_env
+            .data_dir
+            .join("suiup/binaries/testnet/sui-node-v1.39.3");
         assert!(binary_path.exists());
 
         // Verify default binary exists
