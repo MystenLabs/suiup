@@ -6,3 +6,7 @@ installation_type = "archive"
 network_based = true
 supported_networks = ["mainnet"]
 default_network = "mainnet"
+supports_debug = false
+cargo_package = ""
+nightly_toolchain = ""
+shared_repo_binary = false

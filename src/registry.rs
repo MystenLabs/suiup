@@ -44,6 +44,12 @@ fn default_network() -> String {
     "testnet".to_string()
 }
 
+fn normalize_optional_string(value: &mut Option<String>) {
+    if value.as_ref().is_some_and(|v| v.trim().is_empty()) {
+        *value = None;
+    }
+}
+
 impl BinaryConfig {
     pub fn repo_url(&self) -> String {
         format!("https://github.com/{}", self.repository)
@@ -61,8 +67,10 @@ impl BinaryRegistry {
         REGISTRY.get_or_init(|| {
             let mut configs = Vec::new();
             for toml_str in BINARY_CONFIGS {
-                let config: BinaryConfig =
+                let mut config: BinaryConfig =
                     toml::from_str(toml_str).expect("Failed to parse embedded binary TOML config");
+                normalize_optional_string(&mut config.cargo_package);
+                normalize_optional_string(&mut config.nightly_toolchain);
                 configs.push(config);
             }
             configs.sort_by(|a, b| a.name.cmp(&b.name));
@@ -139,6 +147,33 @@ mod tests {
             !registry.all().is_empty(),
             "Registry should have at least one binary"
         );
+    }
+
+    #[test]
+    fn all_tomls_include_all_fields() {
+        let required_fields = [
+            "name",
+            "description",
+            "repository",
+            "main_branch",
+            "installation_type",
+            "network_based",
+            "supported_networks",
+            "default_network",
+            "supports_debug",
+            "cargo_package",
+            "nightly_toolchain",
+            "shared_repo_binary",
+        ];
+
+        for toml_str in BINARY_CONFIGS {
+            for field in &required_fields {
+                assert!(
+                    toml_str.contains(&format!("{field} =")),
+                    "TOML config is missing required field '{field}'\nConfig:\n{toml_str}"
+                );
+            }
+        }
     }
 
     #[test]

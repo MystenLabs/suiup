@@ -7,3 +7,6 @@ network_based = true
 supported_networks = ["testnet", "devnet", "mainnet"]
 default_network = "testnet"
 supports_debug = true
+cargo_package = ""
+nightly_toolchain = ""
+shared_repo_binary = false
