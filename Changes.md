@@ -1,4 +1,4 @@
-## 0.0.9 - Upcoming
+## 0.0.9 - 2026-02-26
 
 - Added support for installing binaries from the signers repository.
 - Refactored binary metadata handling to use TOML-backed definitions and added all expected TOML fields.
