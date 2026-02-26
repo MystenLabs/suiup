@@ -561,14 +561,9 @@ mod tests {
         test_env.initialize_paths()?;
 
         let mut cmd = suiup_command(vec![], &test_env);
-        let usage = if cfg!(windows) {
-            "Usage: suiup.exe"
-        } else {
-            "Usage: suiup"
-        };
         cmd.assert()
             .success()
-            .stdout(predicate::str::contains(usage));
+            .stdout(predicate::str::contains("Usage: suiup"));
 
         Ok(())
     }
