@@ -39,8 +39,7 @@ mod tests {
         cmd.env(DATA_HOME, &test_env.data_dir)
             .env(CONFIG_HOME, &test_env.config_dir)
             .env(CACHE_HOME, &test_env.cache_dir)
-            .env(HOME, test_env.temp_dir.path())
-            .env_remove("GITHUB_TOKEN");
+            .env(HOME, test_env.temp_dir.path());
 
         cmd
     }
