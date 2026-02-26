@@ -7,7 +7,7 @@ use anyhow::{Context, Result};
 use crate::paths::release_archive_dir;
 
 /// Handles the `cleanup` command
-pub async fn handle_cleanup(all: bool, days: u32, dry_run: bool) -> Result<()> {
+pub fn handle_cleanup(all: bool, days: u32, dry_run: bool) -> Result<()> {
     let release_archive_dir = release_archive_dir();
     println!(
         "Release archives directory: {}",

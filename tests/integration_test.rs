@@ -8,6 +8,7 @@ mod tests {
     use crate::test_utils::TestEnv;
     use anyhow::Result;
     use assert_cmd::Command;
+    use assert_cmd::cargo::cargo_bin_cmd;
     use predicates::prelude::*;
     use std::fs;
     use std::time::{Duration, SystemTime};
@@ -32,7 +33,7 @@ mod tests {
     const HOME: &str = "HOME";
 
     fn suiup_command(args: Vec<&str>, test_env: &TestEnv) -> Command {
-        let mut cmd = Command::cargo_bin("suiup").unwrap();
+        let mut cmd = cargo_bin_cmd!("suiup");
         cmd.args(args);
 
         cmd.env(DATA_HOME, &test_env.data_dir)
@@ -47,9 +48,8 @@ mod tests {
     fn github_is_reachable() -> bool {
         use std::net::{TcpStream, ToSocketAddrs};
 
-        let addrs = match ("github.com", 443).to_socket_addrs() {
-            Ok(addrs) => addrs,
-            Err(_) => return false,
+        let Ok(addrs) = ("github.com", 443).to_socket_addrs() else {
+            return false;
         };
 
         for addr in addrs {
@@ -314,7 +314,7 @@ mod tests {
             panic!("Could not run command")
         };
 
-        let version: Vec<_> = mvr_version.split("-").collect();
+        let version: Vec<_> = mvr_version.split('-').collect();
         let version = version[0];
 
         // Install from main branch

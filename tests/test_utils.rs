@@ -1,39 +1,39 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
-use lazy_static::lazy_static;
+use anyhow::{Result, anyhow};
+use std::env;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::{env, sync::Mutex};
+use std::sync::{LazyLock, Mutex, MutexGuard};
 use suiup::paths::{
     binaries_dir, get_cache_home, get_config_home, get_data_home, get_default_bin_dir,
     get_suiup_cache_dir, initialize,
 };
-use suiup::set_env_var;
+use suiup::{remove_env_var, set_env_var};
 use tempfile::TempDir;
 
-#[derive(Debug)]
 pub struct TestEnv {
     pub temp_dir: TempDir,
     pub data_dir: PathBuf,
     pub config_dir: PathBuf,
     pub cache_dir: PathBuf,
     pub bin_dir: PathBuf,
-    original_env: Vec<(String, String)>,
+    original_env: Vec<(String, Option<String>)>,
+    _env_guard: MutexGuard<'static, ()>,
 }
 
-lazy_static! {
-    static ref ZIP_FILES_MUTEX: Mutex<()> = Mutex::new(());
-}
+static ENV_VARS_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+static ZIP_FILES_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 impl TestEnv {
     pub fn new() -> Result<Self> {
+        let env_guard = ENV_VARS_MUTEX.lock().expect("failed to lock env mutex");
         let temp_dir = TempDir::new()?;
         let base = temp_dir.path();
 
-        let home_dir = dirs::home_dir().unwrap();
+        let home_dir = dirs::home_dir().ok_or_else(|| anyhow!("HOME directory is not set"))?;
 
         let data_home = get_data_home();
         let config_home = get_config_home();
@@ -76,7 +76,7 @@ impl TestEnv {
         assert!(bin_dir.exists());
 
         // Store original env vars
-        let vars_to_capture = vec![
+        let vars_to_capture = [
             "LOCALAPPDATA",
             "HOME",
             "XDG_DATA_HOME",
@@ -87,7 +87,7 @@ impl TestEnv {
 
         let original_env = vars_to_capture
             .into_iter()
-            .filter_map(|var| env::var(var).ok().map(|val| (var.to_string(), val)))
+            .map(|var| (var.to_string(), env::var(var).ok()))
             .collect();
 
         // Set test env vars
@@ -115,6 +115,7 @@ impl TestEnv {
             cache_dir,
             bin_dir,
             original_env,
+            _env_guard: env_guard,
         })
     }
 
@@ -125,7 +126,9 @@ impl TestEnv {
     }
 
     pub fn copy_testnet_releases_to_cache(&self) -> Result<()> {
-        let _guard = ZIP_FILES_MUTEX.lock().unwrap();
+        let _guard = ZIP_FILES_MUTEX
+            .lock()
+            .expect("failed to lock zip-files mutex");
         // Create cache directory if it doesn't exist
         std::fs::create_dir_all(&self.cache_dir)?;
 
@@ -210,6 +213,18 @@ impl TestEnv {
 
         std::fs::write(&releases_cache, serde_json::to_string_pretty(&payload)?)?;
         Ok(())
+    }
+}
+
+impl Drop for TestEnv {
+    fn drop(&mut self) {
+        for (key, value) in &self.original_env {
+            if let Some(value) = value {
+                set_env_var!(key, value);
+            } else {
+                remove_env_var!(key);
+            }
+        }
     }
 }
 
@@ -317,15 +332,6 @@ fn copy_or_generate_archive(src: &Path, dst: &Path, entries: Vec<(&str, String)>
     }
 
     Ok(())
-}
-
-impl Drop for TestEnv {
-    fn drop(&mut self) {
-        // Restore original env vars
-        for (var, val) in &self.original_env {
-            set_env_var!(var, val);
-        }
-    }
 }
 
 // Mock HTTP client for testing

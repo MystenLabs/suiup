@@ -7,7 +7,7 @@ use anyhow::Result;
 use comfy_table::*;
 
 /// List all available components
-pub async fn list_components() -> Result<()> {
+pub fn list_components() -> Result<()> {
     let registry = BinaryRegistry::global();
     let mut table = Table::new();
     table

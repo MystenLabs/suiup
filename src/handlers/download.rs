@@ -67,12 +67,12 @@ fn generate_network_suggestions_error(
                 "{binary_name} version {version} not found. {binary_name} is a standalone binary \
                 - try: suiup install {binary_name} {version}",
             );
-        } else {
-            return anyhow!(
-                "{binary_name} release not found. {binary_name} is a standalone binary \
-                - try: suiup install {binary_name}"
-            );
         }
+
+        return anyhow!(
+            "{binary_name} release not found. {binary_name} is a standalone binary \
+            - try: suiup install {binary_name}"
+        );
     }
 
     if let Some(version) = version {
@@ -316,9 +316,8 @@ pub async fn download_file(
                 if local_md5 == expected_md5 {
                     println!("Found {name} in cache, md5 verified");
                     return Ok(name.to_string());
-                } else {
-                    println!("MD5 mismatch for {name}, re-downloading...");
                 }
+                println!("MD5 mismatch for {name}, re-downloading...");
             } else {
                 println!("Found {name} in cache (no md5 to check)");
                 return Ok(name.to_string());
@@ -391,13 +390,12 @@ pub async fn download_file(
             .trim()
             .to_string();
         if local_md5 != expected_md5 {
-            return Err(anyhow!(format!(
-                "MD5 check failed for {}: expected {}, got {}",
-                name, expected_md5, local_md5
-            )));
-        } else {
-            println!("MD5 check passed for {name}");
+            return Err(anyhow!(
+                "MD5 check failed for {name}: expected {expected_md5}, got {local_md5}"
+            ));
         }
+
+        println!("MD5 check passed for {name}");
     }
 
     Ok(name.to_string())

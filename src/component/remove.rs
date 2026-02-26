@@ -12,7 +12,7 @@ use crate::paths::{default_file_path, get_default_bin_dir};
 use crate::types::InstalledBinaries;
 
 /// Remove a component and its associated files
-pub async fn remove_component(binary: &str) -> Result<()> {
+pub fn remove_component(binary: &str) -> Result<()> {
     let mut installed_binaries = InstalledBinaries::new()?;
 
     let binaries_to_remove = installed_binaries

@@ -65,20 +65,20 @@ mod tests {
         assert_eq!(BinaryName::new("walrus").unwrap().to_string(), "walrus");
     }
 
-    #[tokio::test]
-    async fn test_cleanup_empty_directory() -> Result<()> {
+    #[test]
+    fn test_cleanup_empty_directory() -> Result<()> {
         let temp_dir = TempDir::new()?;
         set_env_var!("XDG_CACHE_HOME", temp_dir.path());
 
         // Test cleanup on empty directory
-        let result = handle_cleanup(false, 30, true).await;
+        let result = handle_cleanup(false, 30, true);
         assert!(result.is_ok());
 
         Ok(())
     }
 
-    #[tokio::test]
-    async fn test_cleanup_dry_run() -> Result<()> {
+    #[test]
+    fn test_cleanup_dry_run() -> Result<()> {
         let temp_dir = TempDir::new()?;
         let cache_dir = temp_dir.path().join("suiup").join("release_archives");
         fs::create_dir_all(&cache_dir)?;
@@ -94,12 +94,10 @@ mod tests {
         let old_time = SystemTime::now() - Duration::from_secs(60 * 60 * 24 * 40); // 40 days ago
         filetime::set_file_mtime(&old_file, filetime::FileTime::from_system_time(old_time))?;
 
-        unsafe {
-            std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
-        }
+        set_env_var!("XDG_CACHE_HOME", temp_dir.path());
 
         // Dry run should not remove files
-        let result = handle_cleanup(false, 30, true).await;
+        let result = handle_cleanup(false, 30, true);
         assert!(result.is_ok());
         assert!(old_file.exists());
         assert!(new_file.exists());
@@ -107,13 +105,11 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn test_cleanup_remove_old_files() -> Result<()> {
+    #[test]
+    fn test_cleanup_remove_old_files() -> Result<()> {
         let temp_dir = TempDir::new()?;
         // Set up environment variable for cache directory
-        unsafe {
-            std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
-        }
+        set_env_var!("XDG_CACHE_HOME", temp_dir.path());
         // Create cache directory
         let cache_dir = paths::release_archive_dir();
         fs::create_dir_all(&cache_dir)?;
@@ -129,12 +125,10 @@ mod tests {
         let old_time = SystemTime::now() - Duration::from_secs(60 * 60 * 24 * 40); // 40 days ago
         filetime::set_file_mtime(&old_file, filetime::FileTime::from_system_time(old_time))?;
 
-        unsafe {
-            std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
-        }
+        set_env_var!("XDG_CACHE_HOME", temp_dir.path());
 
         // Actual cleanup should remove old file but keep new file
-        let result = handle_cleanup(false, 30, false).await;
+        let result = handle_cleanup(false, 30, false);
         assert!(result.is_ok());
         assert!(!old_file.exists());
         assert!(new_file.exists());
@@ -142,13 +136,11 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn test_cleanup_remove_all() -> Result<()> {
+    #[test]
+    fn test_cleanup_remove_all() -> Result<()> {
         let temp_dir = TempDir::new()?;
         // Set up environment variable for cache directory
-        unsafe {
-            std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
-        }
+        set_env_var!("XDG_CACHE_HOME", temp_dir.path());
         // Create cache directory
         let cache_dir = paths::release_archive_dir();
         fs::create_dir_all(&cache_dir)?;
@@ -160,12 +152,10 @@ mod tests {
         fs::write(&file1, b"content1")?;
         fs::write(&file2, b"content2")?;
 
-        unsafe {
-            std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
-        }
+        set_env_var!("XDG_CACHE_HOME", temp_dir.path());
 
         // Remove all should clear everything
-        let result = handle_cleanup(true, 30, false).await;
+        let result = handle_cleanup(true, 30, false);
         assert!(result.is_ok());
         assert!(!file1.exists());
         assert!(!file2.exists());

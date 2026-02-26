@@ -144,53 +144,47 @@ pub struct CommandMetadata {
     pub version: Option<String>,
 }
 
-pub fn parse_component_with_version(s: &str) -> Result<CommandMetadata, anyhow::Error> {
-    let split_char = if s.contains("@") {
-        "@"
-    } else if s.contains("==") {
-        "=="
-    } else if s.contains("=") {
-        "="
-    } else {
-        // TODO this is a hack because we don't have a better way to split
-        " "
-    };
-
-    let parts: Vec<&str> = s.split(split_char).collect();
-
-    match parts.len() {
-        1 => {
-            let component = BinaryName::new(parts[0])
-                .map_err(|_| anyhow!("Invalid binary name: {}. Use `suiup list` to find available binaries to install or `suiup show` to see which binaries are already installed.\nWhen specifying versions, use @, e.g.: sui@v1.60.0\n\nMore information in the docs: https://github.com/mystenLabs/suiup?tab=readme-ov-file#switch-between-versions-note-that-default-set-requires-to-specify-a-version", parts[0]))?;
-            let (network, version) = parse_version_spec(None)?;
-            let component_metadata = CommandMetadata {
-                name: component,
-                network,
-                version,
-            };
-            Ok(component_metadata)
-        }
-        2 => {
-            let component = BinaryName::new(parts[0])
-                .map_err(|_| anyhow!("Invalid binary name: {}. Use `suiup list` to find available binaries to install or `suiup show` to see which binaries are already installed.\nWhen specifying versions, use `@`, e.g.: sui@v1.60.0\n\nMore information in the docs: https://github.com/mystenLabs/suiup?tab=readme-ov-file#switch-between-versions-note-that-default-set-requires-to-specify-a-version", parts[0]))?;
-            if parts[1].is_empty() {
-                bail!(
-                    "Version cannot be empty. Use 'binary' or 'binary@version' (e.g., sui@v1.60.0)"
-                );
-            }
-            let (network, version) = parse_version_spec(Some(parts[1].to_string()))?;
-            let component_metadata = CommandMetadata {
-                name: component,
-                network,
-                version,
-            };
-            Ok(component_metadata)
-        }
-        _ => bail!("Invalid format. Use 'binary' or 'binary version'".to_string()),
-    }
+fn parse_binary_name(name: &str) -> Result<BinaryName> {
+    BinaryName::new(name).map_err(|_| {
+        anyhow!(
+            "Invalid binary name: {name}. Use `suiup list` to find available binaries to install or `suiup show` to see which binaries are already installed.\nWhen specifying versions, use `@`, e.g.: sui@v1.60.0\n\nMore information in the docs: https://github.com/mystenLabs/suiup?tab=readme-ov-file#switch-between-versions-note-that-default-set-requires-to-specify-a-version"
+        )
+    })
 }
 
-pub fn parse_version_spec(spec: Option<String>) -> Result<(String, Option<String>)> {
+fn split_component_spec(s: &str) -> (&str, Option<&str>) {
+    for delimiter in ["@", "==", "="] {
+        if let Some((name, spec)) = s.split_once(delimiter) {
+            return (name, Some(spec));
+        }
+    }
+
+    if let Some((name, spec)) = s.split_once(' ') {
+        return (name, Some(spec));
+    }
+
+    (s, None)
+}
+
+pub fn parse_component_with_version(s: &str) -> Result<CommandMetadata, anyhow::Error> {
+    let (name, version_spec) = split_component_spec(s);
+    let component = parse_binary_name(name)?;
+
+    if let Some(spec) = version_spec
+        && spec.is_empty()
+    {
+        bail!("Version cannot be empty. Use 'binary' or 'binary@version' (e.g., sui@v1.60.0)");
+    }
+
+    let (network, version) = parse_version_spec(version_spec)?;
+    Ok(CommandMetadata {
+        name: component,
+        network,
+        version,
+    })
+}
+
+pub fn parse_version_spec(spec: Option<&str>) -> Result<(String, Option<String>)> {
     match spec {
         None => Ok(("testnet".to_string(), None)),
         Some(spec) => {
@@ -201,26 +195,20 @@ pub fn parse_version_spec(spec: Option<String>) -> Result<(String, Option<String
                 let parts: Vec<&str> = spec.splitn(2, '-').collect();
                 Ok((parts[0].to_string(), Some(parts[1].to_string())))
             } else if spec == "testnet" || spec == "devnet" || spec == "mainnet" {
-                Ok((spec, None))
+                Ok((spec.to_string(), None))
             } else {
                 // Validate that it looks like a version (starts with 'v' + digit or digit, and contains a dot)
-                let starts_valid = spec
-                    .chars()
-                    .next()
-                    .map(|c| {
-                        c.is_ascii_digit()
-                            || (c == 'v'
-                                && spec.chars().nth(1).is_some_and(|c2| c2.is_ascii_digit()))
-                    })
-                    .unwrap_or(false);
+                let starts_valid = spec.chars().next().is_some_and(|c| {
+                    c.is_ascii_digit()
+                        || (c == 'v' && spec.chars().nth(1).is_some_and(|c2| c2.is_ascii_digit()))
+                });
                 let has_dot = spec.contains('.');
                 if !starts_valid || !has_dot {
                     bail!(
-                        "Invalid version format: '{}'. Expected a version like 'v1.60.0' or '1.60.0', or when applicable, 'testnet', 'devnet', 'mainnet'.",
-                        spec
+                        "Invalid version format: '{spec}'. Expected a version like 'v1.60.0' or '1.60.0', or when applicable, 'testnet', 'devnet', 'mainnet'.",
                     );
                 }
-                Ok(("testnet".to_string(), Some(spec)))
+                Ok(("testnet".to_string(), Some(spec.to_string())))
             }
         }
     }

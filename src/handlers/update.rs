@@ -73,7 +73,7 @@ pub async fn handle_update(
                 nightly: None,
                 yes,
             },
-            github_token,
+            github_token.as_deref(),
         )
         .await?;
         return Ok(());
@@ -103,7 +103,7 @@ pub async fn handle_update(
                 nightly: None,
                 yes,
             },
-            github_token.clone(),
+            github_token.as_deref(),
         )
         .await?;
     }

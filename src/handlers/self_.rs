@@ -85,18 +85,16 @@ struct Ver {
 
 impl Ver {
     fn from_str(s: &str) -> Result<Self> {
-        let parts: Vec<&str> = s.split('.').collect();
-        if parts.len() != 3 {
+        let mut parts = s.trim_start_matches('v').split('.');
+        let (Some(major), Some(minor), Some(patch), None) =
+            (parts.next(), parts.next(), parts.next(), parts.next())
+        else {
             return Err(anyhow::anyhow!("Invalid version format"));
-        }
-        let major = if parts[0].starts_with('v') {
-            parts[0][1..].parse::<usize>()?
-        } else {
-            parts[0].parse::<usize>()?
         };
 
-        let minor = parts[1].parse::<usize>()?;
-        let patch = parts[2].parse::<usize>()?;
+        let major = major.parse::<usize>()?;
+        let minor = minor.parse::<usize>()?;
+        let patch = patch.parse::<usize>()?;
         Ok(Ver {
             major,
             minor,
@@ -114,61 +112,25 @@ impl Display for Ver {
 pub async fn handle_update() -> Result<()> {
     // find the current binary version
     let current_exe = std::env::current_exe()?;
-    let current_version = Command::new(&current_exe).arg("--version").output()?.stdout;
-    let current_version = String::from_utf8(current_version)?.trim().to_string();
-
-    if current_version.is_empty() {
-        return Err(anyhow::anyhow!(
-            "Failed to get current version for suiup binary. Please update manually."
-        ));
-    }
-
-    let split = current_version.split(" ").collect::<Vec<_>>();
-
-    if split.len() != 2 {
-        return Err(anyhow::anyhow!(
-            "Failed to parse current version for suiup binary. Please update manually."
-        ));
-    }
-
-    let current_version = Ver::from_str(split[1])?;
-
-    // find the latest version on github in releases
-    let repo = "https://api.github.com/repos/MystenLabs/suiup/releases/latest";
-    let client = reqwest::Client::new();
-    let response = client
-        .get(repo)
-        .header("User-Agent", "suiup")
-        .send()
-        .await
-        .with_context(|| format!("Failed to send request to {repo}"))?;
-
-    let status = response.status();
-    if !status.is_success() {
-        let body = response
-            .text()
-            .await
-            .unwrap_or_else(|e| format!("Unable to read response body: {e}"));
-        return Err(anyhow!(
-            "Failed to fetch latest version from GitHub (status {}) for {}: {}",
-            status,
-            repo,
-            body
-        ));
-    }
-
-    let release: GitHubRelease =
-        parse_json_response(response, repo, "GitHub latest release").await?;
-    let tag = release.tag_name;
-
-    let latest_version = Ver::from_str(&tag)?;
+    let version_output = Command::new(&current_exe).arg("--version").output()?.stdout;
+    let version_output = String::from_utf8(version_output)?;
+    let current_version = version_output
+        .split_whitespace()
+        .nth(1)
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Failed to parse current version for suiup binary. Please update manually."
+            )
+        })
+        .and_then(Ver::from_str)?;
+    let latest_version = get_latest_version().await?;
+    let tag = format!("v{latest_version}");
 
     if current_version == latest_version {
         println!("suiup is already up to date");
         return Ok(());
-    } else {
-        println!("Updating to latest version: {}", latest_version);
     }
+    println!("Updating to latest version: {}", latest_version);
 
     // download the latest version from github
     // https://github.com/MystenLabs/suiup/releases/download/v0.0.1/suiup-Linux-musl-x86_64.tar.gz
@@ -397,8 +359,6 @@ mod tests {
         let v2 = Ver::from_str("v1.2.3").unwrap();
         assert!(v1 <= v2);
         assert!(v1 >= v2);
-        assert!(!(v1 < v2));
-        assert!(!(v1 > v2));
 
         // Test complex comparisons
         let v0_0_4 = Ver::from_str("0.0.4").unwrap();
@@ -409,7 +369,7 @@ mod tests {
         // Test the specific case from the bug report
         let current = Ver::from_str("0.0.4").unwrap();
         let latest = Ver::from_str("0.0.3").unwrap();
-        assert!(!(current < latest)); // Current is newer, should not show warning
+        assert!(current >= latest); // Current is newer, should not show warning
         assert!(latest < current); // Latest is older than current
     }
 

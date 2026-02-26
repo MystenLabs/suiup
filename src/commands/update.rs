@@ -20,11 +20,6 @@ pub struct Command {
 
 impl Command {
     pub async fn exec(&self, github_token: Option<&str>) -> Result<()> {
-        handle_update(
-            self.name.clone(),
-            self.yes,
-            github_token.map(str::to_owned),
-        )
-        .await
+        handle_update(self.name.clone(), self.yes, github_token.map(str::to_owned)).await
     }
 }
