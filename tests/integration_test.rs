@@ -473,16 +473,12 @@ mod tests {
         cmd.assert().success();
 
         // Verify first version is set as default
-        #[cfg(windows)]
-        let default_sui_binary = test_env.bin_dir.join("sui.exe");
-        #[cfg(not(windows))]
-        let default_sui_binary = test_env.bin_dir.join("sui");
-
-        let mut cmd = Command::new(&default_sui_binary);
-        cmd.arg("--version");
+        let mut cmd = suiup_command(vec!["default", "get"], &test_env);
         cmd.assert()
             .success()
-            .stdout(predicate::str::contains("1.39.3"));
+            .stdout(predicate::str::contains("sui"))
+            .stdout(predicate::str::contains("testnet"))
+            .stdout(predicate::str::contains("v1.39.3"));
 
         // Install second version (1.40.1)
         let mut cmd = suiup_command(vec!["install", "sui@testnet-1.40.1", "-y"], &test_env);
@@ -493,11 +489,12 @@ mod tests {
         cmd.assert().success();
 
         // Verify second version is default
-        let mut cmd = Command::new(&default_sui_binary);
-        cmd.arg("--version");
+        let mut cmd = suiup_command(vec!["default", "get"], &test_env);
         cmd.assert()
             .success()
-            .stdout(predicate::str::contains("1.40.1"));
+            .stdout(predicate::str::contains("sui"))
+            .stdout(predicate::str::contains("testnet"))
+            .stdout(predicate::str::contains("v1.40.1"));
 
         // Use switch command to go back to testnet (should pick latest, which is 1.40.1)
         let mut cmd = suiup_command(vec!["switch", "sui@testnet"], &test_env);
@@ -506,11 +503,12 @@ mod tests {
         ));
 
         // Verify switch command maintained the default (since it picked the latest)
-        let mut cmd = Command::new(&default_sui_binary);
-        cmd.arg("--version");
+        let mut cmd = suiup_command(vec!["default", "get"], &test_env);
         cmd.assert()
             .success()
-            .stdout(predicate::str::contains("1.40.1"));
+            .stdout(predicate::str::contains("sui"))
+            .stdout(predicate::str::contains("testnet"))
+            .stdout(predicate::str::contains("v1.40.1"));
 
         // Verify default get shows correct info
         let mut cmd = suiup_command(vec!["default", "get"], &test_env);
