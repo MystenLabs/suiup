@@ -181,6 +181,7 @@ mod tests {
         let registry = BinaryRegistry::global();
         for name in &[
             "sui",
+            "sui-node",
             "mvr",
             "walrus",
             "site-builder",

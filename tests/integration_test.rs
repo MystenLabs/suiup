@@ -135,6 +135,50 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_sui_node_install_and_use_binary() -> Result<()> {
+        let test_env = TestEnv::new()?;
+        test_env.initialize_paths()?;
+        test_env.copy_testnet_releases_to_cache()?;
+
+        // Run install command
+        let mut cmd = suiup_command(vec!["install", "sui-node@testnet-1.39.3", "-y"], &test_env);
+
+        #[cfg(windows)]
+        let assert_string = "'sui-node.exe' extracted successfully!";
+        #[cfg(not(windows))]
+        let assert_string = "'sui-node' extracted successfully!";
+
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains(assert_string));
+
+        // Verify binary exists in correct location
+        #[cfg(windows)]
+        let binary_path = test_env
+            .data_dir
+            .join("suiup/binaries/testnet/sui-node-v1.39.3.exe");
+        #[cfg(not(windows))]
+        let binary_path = test_env.data_dir.join("suiup/binaries/testnet/sui-node-v1.39.3");
+        assert!(binary_path.exists());
+
+        // Verify default binary exists
+        #[cfg(windows)]
+        let default_sui_node_binary = test_env.bin_dir.join("sui-node.exe");
+        #[cfg(not(windows))]
+        let default_sui_node_binary = test_env.bin_dir.join("sui-node");
+        assert!(default_sui_node_binary.exists());
+
+        // Test binary execution
+        let mut cmd = Command::new(default_sui_node_binary);
+        cmd.arg("--version");
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains("1.39.3"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_install_nightly() -> Result<()> {
         Ok(())
     }
