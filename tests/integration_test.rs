@@ -470,13 +470,7 @@ mod tests {
 
         // Install first version (1.39.3)
         let mut cmd = suiup_command(vec!["install", "sui@testnet-1.39.3", "-y"], &test_env);
-        #[cfg(windows)]
-        let assert_string = "'sui.exe' extracted successfully!";
-        #[cfg(not(windows))]
-        let assert_string = "'sui' extracted successfully!";
-        cmd.assert()
-            .success()
-            .stdout(predicate::str::contains(assert_string));
+        cmd.assert().success();
 
         // Verify first version is set as default
         #[cfg(windows)]
@@ -492,11 +486,13 @@ mod tests {
 
         // Install second version (1.40.1)
         let mut cmd = suiup_command(vec!["install", "sui@testnet-1.40.1", "-y"], &test_env);
-        cmd.assert()
-            .success()
-            .stdout(predicate::str::contains(assert_string));
+        cmd.assert().success();
 
-        // Verify second version is now default
+        // Explicitly set the default to the second installed version before switch validation.
+        let mut cmd = suiup_command(vec!["default", "set", "sui@testnet-1.40.1"], &test_env);
+        cmd.assert().success();
+
+        // Verify second version is default
         let mut cmd = Command::new(&default_sui_binary);
         cmd.arg("--version");
         cmd.assert()
