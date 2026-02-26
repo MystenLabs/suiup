@@ -15,7 +15,7 @@ With `suiup`, you can:
 
 - Install specific versions of `sui`, `sui-node`, `mvr`, `walrus`, or `site-builder (walrus-sites)`, `move-analyzer` (with more tools coming soon)
 - Install from a branch in the repository to try unreleased features or fixes
-- Get debug builds of `sui` or `sui-node` (needed for commands like `sui move test --coverage`)
+- Get debug builds of `sui` (needed for commands like `sui move test --coverage`)
 - List and switch between installed binaries for different networks (e.g., devnet vs mainnet)
 - Simplify tool installation in CI environments
 
@@ -128,7 +128,6 @@ suiup install move-analyzer@mainnet
 ```bash
 suiup install sui-node
 suiup install sui-node@testnet-1.40.1 # install a specific version
-suiup install sui-node@testnet --debug # install the debug build
 ```
 
 ### List available binaries to install

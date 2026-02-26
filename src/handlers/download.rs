@@ -5,45 +5,74 @@ use crate::handlers::release::{
     ensure_version_prefix, find_last_release_by_network, find_networks_with_version,
 };
 use crate::handlers::version::extract_version_from_release;
-use crate::types::Repo;
+use crate::registry::BinaryConfig;
 use crate::{handlers::release::release_list, paths::release_archive_dir, types::Release};
-use anyhow::{Error, anyhow, bail};
+use anyhow::{Context, Error, anyhow, bail};
 use futures_util::StreamExt;
 use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
-use md5::Context;
+use md5::Context as Md5Context;
 use reqwest::{
     Client,
     header::{HeaderMap, HeaderValue, USER_AGENT},
 };
+use serde::de::DeserializeOwned;
 use std::fs::File;
 use std::io::Read;
 use std::{cmp::min, io::Write, path::PathBuf, time::Instant};
 
 use tracing::debug;
 
+fn find_cached_release_archive(
+    tag: &str,
+    os: &str,
+    arch: &str,
+) -> Result<Option<String>, anyhow::Error> {
+    let cache_dir = release_archive_dir();
+    if !cache_dir.exists() {
+        return Ok(None);
+    }
+
+    for entry in std::fs::read_dir(&cache_dir)
+        .with_context(|| format!("Cannot read cache directory {}", cache_dir.display()))?
+    {
+        let entry =
+            entry.with_context(|| format!("Cannot read entry in {}", cache_dir.display()))?;
+        let filename = entry.file_name().to_string_lossy().to_string();
+
+        if filename.contains(tag)
+            && filename.contains(os)
+            && filename.contains(arch)
+            && (filename.ends_with(".tgz") || filename.ends_with(".zip"))
+        {
+            return Ok(Some(filename));
+        }
+    }
+
+    Ok(None)
+}
+
 /// Generate helpful error message with network suggestions
-/// Note: This is only applicable for sui and walrus. MVR binary is standalone, not tied to a network.
 fn generate_network_suggestions_error(
-    repo: &Repo,
+    config: &BinaryConfig,
     releases: &[Release],
     version: Option<&str>,
     requested_network: &str,
 ) -> anyhow::Error {
-    let binary_name = repo.binary_name();
+    let binary_name = &config.name;
 
-    // MVR is a standalone binary, not tied to networks like sui and walrus
-    if matches!(repo, Repo::Mvr) {
+    // Standalone binaries are not tied to networks
+    if !config.network_based {
         if let Some(version) = version {
             return anyhow!(
                 "{binary_name} version {version} not found. {binary_name} is a standalone binary \
                 - try: suiup install {binary_name} {version}",
             );
-        } else {
-            return anyhow!(
-                "{binary_name} release not found. {binary_name} is a standalone binary \
-                - try: suiup install {binary_name}"
-            );
         }
+
+        return anyhow!(
+            "{binary_name} release not found. {binary_name} is a standalone binary \
+            - try: suiup install {binary_name}"
+        );
     }
 
     if let Some(version) = version {
@@ -117,7 +146,8 @@ pub fn detect_os_arch() -> Result<(String, String), Error> {
 /// Downloads a release with a specific version
 /// The network is used to filter the release
 pub async fn download_release_at_version(
-    repo: Repo,
+    repo_slug: &str,
+    config: &BinaryConfig,
     network: &str,
     version: &str,
     github_token: Option<String>,
@@ -129,11 +159,16 @@ pub async fn download_release_at_version(
 
     let tag = format!("{}-{}", network, version);
 
+    if let Some(filename) = find_cached_release_archive(&tag, &os, &arch)? {
+        println!("Found {filename} in cache");
+        return Ok(filename);
+    }
+
     println!("Searching for release with tag: {}...", tag);
     let client = reqwest::Client::new();
     let mut headers = HeaderMap::new();
 
-    let releases = release_list(&repo, github_token.clone()).await?.0;
+    let releases = release_list(repo_slug, github_token.clone()).await?.0;
 
     if let Some(release) = releases
         .iter()
@@ -145,47 +180,52 @@ pub async fn download_release_at_version(
 
         // Add authorization header if token is provided
         if let Some(token) = &github_token {
-            headers.insert(
-                "Authorization",
-                HeaderValue::from_str(&format!("token {}", token)).unwrap(),
-            );
+            let auth_header = HeaderValue::from_str(&format!("token {}", token))
+                .map_err(|e| anyhow!("Invalid GitHub token for Authorization header: {e}"))?;
+            headers.insert("Authorization", auth_header);
         }
 
-        let url = format!("https://api.github.com/repos/{repo}/releases/tags/{}", tag);
-        let response = client.get(&url).headers(headers).send().await?;
+        let url = format!(
+            "https://api.github.com/repos/{repo_slug}/releases/tags/{}",
+            tag
+        );
+        let response = client
+            .get(&url)
+            .headers(headers)
+            .send()
+            .await
+            .with_context(|| format!("Failed to send request to {url}"))?;
 
         if !response.status().is_success() {
             return Err(generate_network_suggestions_error(
-                &repo,
+                config,
                 &releases,
                 Some(&version),
                 network,
             ));
         }
 
-        let release: Release = response
-            .json()
-            .await
-            .map_err(|e| anyhow!("Failed to parse GitHub release response: {}", e))?;
+        let release: Release = parse_json_response(response, &url, "GitHub release").await?;
         download_asset_from_github(&release, &os, &arch, github_token).await
     }
 }
 
 /// Downloads the latest release for a given network
 pub async fn download_latest_release(
-    repo: Repo,
+    repo_slug: &str,
+    config: &BinaryConfig,
     network: &str,
     github_token: Option<String>,
 ) -> Result<String, anyhow::Error> {
     println!("Downloading release list");
-    debug!("Downloading release list for repo: {repo} and network: {network}");
-    let releases = release_list(&repo, github_token.clone()).await?;
+    debug!("Downloading release list for repo: {repo_slug} and network: {network}");
+    let releases = release_list(repo_slug, github_token.clone()).await?;
 
     let (os, arch) = detect_os_arch()?;
 
     let last_release = find_last_release_by_network(releases.0.clone(), network)
         .await
-        .ok_or_else(|| generate_network_suggestions_error(&repo, &releases.0, None, network))?;
+        .ok_or_else(|| generate_network_suggestions_error(config, &releases.0, None, network))?;
 
     println!(
         "Last {network} release: {}",
@@ -213,14 +253,17 @@ pub async fn download_file(
         request = request.header("Authorization", format!("token {}", token));
     }
 
-    let response = request.send().await?;
+    let response = request
+        .send()
+        .await
+        .with_context(|| format!("Failed to send download request to {url}"))?;
 
     let status = response.status();
     if !status.is_success() {
         let body = response
             .text()
             .await
-            .unwrap_or_else(|_| "Unable to read response body".to_string());
+            .unwrap_or_else(|e| format!("Unable to read response body: {e}"));
         bail!("Failed to download (status {}): {}", status, body);
     }
 
@@ -236,15 +279,29 @@ pub async fn download_file(
     }
 
     if download_to.exists() {
-        if download_to.metadata()?.len() == total_size {
+        if download_to
+            .metadata()
+            .with_context(|| {
+                format!(
+                    "Cannot read metadata for existing file {}",
+                    download_to.display()
+                )
+            })?
+            .len()
+            == total_size
+        {
             // Check md5 if .md5 file exists
             let md5_path = download_to.with_extension("md5");
             if md5_path.exists() {
-                let mut file = File::open(download_to)?;
-                let mut hasher = Context::new();
+                let mut file = File::open(download_to).with_context(|| {
+                    format!("Cannot open file for MD5 check {}", download_to.display())
+                })?;
+                let mut hasher = Md5Context::new();
                 let mut buffer = [0u8; 8192];
                 loop {
-                    let n = file.read(&mut buffer)?;
+                    let n = file.read(&mut buffer).with_context(|| {
+                        format!("Cannot read file for MD5 check {}", download_to.display())
+                    })?;
                     if n == 0 {
                         break;
                     }
@@ -252,19 +309,26 @@ pub async fn download_file(
                 }
                 let result = hasher.finalize();
                 let local_md5 = format!("{:x}", result);
-                let expected_md5 = std::fs::read_to_string(md5_path)?.trim().to_string();
+                let expected_md5 = std::fs::read_to_string(&md5_path)
+                    .with_context(|| format!("Cannot read MD5 file {}", md5_path.display()))?
+                    .trim()
+                    .to_string();
                 if local_md5 == expected_md5 {
                     println!("Found {name} in cache, md5 verified");
                     return Ok(name.to_string());
-                } else {
-                    println!("MD5 mismatch for {name}, re-downloading...");
                 }
+                println!("MD5 mismatch for {name}, re-downloading...");
             } else {
                 println!("Found {name} in cache (no md5 to check)");
                 return Ok(name.to_string());
             }
         }
-        std::fs::remove_file(download_to)?;
+        std::fs::remove_file(download_to).with_context(|| {
+            format!(
+                "Cannot remove stale cached file before re-download {}",
+                download_to.display()
+            )
+        })?;
     }
 
     let pb = ProgressBar::new(total_size);
@@ -273,14 +337,16 @@ pub async fn download_file(
         .unwrap()
         .progress_chars("=>-"));
 
-    let mut file = std::fs::File::create(download_to)?;
+    let mut file = std::fs::File::create(download_to)
+        .with_context(|| format!("Cannot create download file {}", download_to.display()))?;
     let mut downloaded: u64 = 0;
     let mut stream = response.bytes_stream();
     let start = Instant::now();
 
     while let Some(item) = stream.next().await {
         let chunk = item?;
-        file.write_all(&chunk)?;
+        file.write_all(&chunk)
+            .with_context(|| format!("Cannot write to download file {}", download_to.display()))?;
         let new = min(downloaded + (chunk.len() as u64), total_size);
         downloaded = new;
         pb.set_position(new);
@@ -297,11 +363,21 @@ pub async fn download_file(
     // After download, check md5 if .md5 file exists
     let md5_path = download_to.with_extension("md5");
     if md5_path.exists() {
-        let mut file = File::open(download_to)?;
-        let mut hasher = Context::new();
+        let mut file = File::open(download_to).with_context(|| {
+            format!(
+                "Cannot open downloaded file for MD5 check {}",
+                download_to.display()
+            )
+        })?;
+        let mut hasher = Md5Context::new();
         let mut buffer = [0u8; 8192];
         loop {
-            let n = file.read(&mut buffer)?;
+            let n = file.read(&mut buffer).with_context(|| {
+                format!(
+                    "Cannot read downloaded file for MD5 check {}",
+                    download_to.display()
+                )
+            })?;
             if n == 0 {
                 break;
             }
@@ -309,18 +385,40 @@ pub async fn download_file(
         }
         let result = hasher.finalize();
         let local_md5 = format!("{:x}", result);
-        let expected_md5 = std::fs::read_to_string(md5_path)?.trim().to_string();
+        let expected_md5 = std::fs::read_to_string(&md5_path)
+            .with_context(|| format!("Cannot read MD5 file {}", md5_path.display()))?
+            .trim()
+            .to_string();
         if local_md5 != expected_md5 {
-            return Err(anyhow!(format!(
-                "MD5 check failed for {}: expected {}, got {}",
-                name, expected_md5, local_md5
-            )));
-        } else {
-            println!("MD5 check passed for {name}");
+            return Err(anyhow!(
+                "MD5 check failed for {name}: expected {expected_md5}, got {local_md5}"
+            ));
         }
+
+        println!("MD5 check passed for {name}");
     }
 
     Ok(name.to_string())
+}
+
+async fn parse_json_response<T>(
+    response: reqwest::Response,
+    request_url: &str,
+    response_name: &str,
+) -> Result<T, anyhow::Error>
+where
+    T: DeserializeOwned,
+{
+    let response_body = response
+        .text()
+        .await
+        .with_context(|| format!("Cannot read {response_name} response body from {request_url}"))?;
+
+    serde_json::from_str(&response_body).map_err(|e| {
+        anyhow!(
+            "Failed to deserialize {response_name} response from {request_url}: {e}\nResponse body:\n{response_body}"
+        )
+    })
 }
 
 /// Downloads the archived release from GitHub and returns the file name
@@ -350,6 +448,7 @@ async fn download_asset_from_github(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::registry::BinaryRegistry;
     use crate::types::{Asset, Release};
 
     fn create_test_release(asset_names: Vec<&str>) -> Release {
@@ -365,21 +464,15 @@ mod tests {
     }
 
     #[test]
-    fn test_binary_name() {
-        assert_eq!(Repo::Sui.binary_name(), "sui");
-        assert_eq!(Repo::Walrus.binary_name(), "walrus");
-        assert_eq!(Repo::Mvr.binary_name(), "mvr");
-    }
-
-    #[test]
     fn test_generate_network_suggestions_error_with_version() {
+        let config = BinaryRegistry::global().get("sui").unwrap();
         let releases = vec![
             create_test_release(vec!["sui-devnet-v1.53.0-linux-x86_64.tgz"]),
             create_test_release(vec!["sui-mainnet-v1.53.0-linux-x86_64.tgz"]),
         ];
 
         let error =
-            generate_network_suggestions_error(&Repo::Sui, &releases, Some("1.53.0"), "testnet");
+            generate_network_suggestions_error(config, &releases, Some("1.53.0"), "testnet");
         let error_msg = error.to_string();
 
         assert!(error_msg.contains("Release testnet-1.53.0 not found"));
@@ -390,12 +483,13 @@ mod tests {
 
     #[test]
     fn test_generate_network_suggestions_error_without_version() {
+        let config = BinaryRegistry::global().get("sui").unwrap();
         let releases = vec![
             create_test_release(vec!["sui-devnet-v1.53.0-linux-x86_64.tgz"]),
             create_test_release(vec!["walrus-mainnet-v1.54.0-linux-x86_64.tgz"]),
         ];
 
-        let error = generate_network_suggestions_error(&Repo::Sui, &releases, None, "testnet");
+        let error = generate_network_suggestions_error(config, &releases, None, "testnet");
         let error_msg = error.to_string();
 
         assert!(error_msg.contains("No releases found for testnet network"));
@@ -406,9 +500,10 @@ mod tests {
 
     #[test]
     fn test_generate_network_suggestions_error_mvr_with_version() {
+        let config = BinaryRegistry::global().get("mvr").unwrap();
         let releases = vec![];
         let error =
-            generate_network_suggestions_error(&Repo::Mvr, &releases, Some("1.0.0"), "standalone");
+            generate_network_suggestions_error(config, &releases, Some("1.0.0"), "standalone");
         let error_msg = error.to_string();
 
         assert!(error_msg.contains("mvr version 1.0.0 not found"));
@@ -418,8 +513,9 @@ mod tests {
 
     #[test]
     fn test_generate_network_suggestions_error_mvr_without_version() {
+        let config = BinaryRegistry::global().get("mvr").unwrap();
         let releases = vec![];
-        let error = generate_network_suggestions_error(&Repo::Mvr, &releases, None, "standalone");
+        let error = generate_network_suggestions_error(config, &releases, None, "standalone");
         let error_msg = error.to_string();
 
         assert!(error_msg.contains("mvr release not found"));

@@ -7,6 +7,7 @@ pub mod fs_utils;
 pub mod handle_commands;
 pub mod handlers;
 pub mod paths;
+pub mod registry;
 pub mod standalone;
 pub mod types;
 
@@ -15,15 +16,18 @@ pub mod types;
 ///
 /// # Example
 /// ```
+/// # use suiup::set_env_var;
 /// set_env_var!("XDG_DATA_HOME", "/path/to/data");
 /// ```
 #[macro_export]
 macro_rules! set_env_var {
-    ($key:expr, $value:expr) => {
+    ($key:expr, $value:expr) => {{
+        let key = $key;
+        let value = $value;
         unsafe {
-            std::env::set_var($key, $value);
+            std::env::set_var(key, value);
         }
-    };
+    }};
 }
 
 /// Macro to safely wrap `std::env::remove_var` calls in an unsafe block.
@@ -31,13 +35,15 @@ macro_rules! set_env_var {
 ///
 /// # Example
 /// ```
-/// remove_env_var!("XDG_DATA_HOME", "/path/to/data");
+/// # use suiup::remove_env_var;
+/// remove_env_var!("XDG_DATA_HOME");
 /// ```
 #[macro_export]
 macro_rules! remove_env_var {
-    ($key:expr) => {
+    ($key:expr) => {{
+        let key = $key;
         unsafe {
-            std::env::remove_var($key);
+            std::env::remove_var(key);
         }
-    };
+    }};
 }

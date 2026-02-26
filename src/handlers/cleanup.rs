@@ -2,12 +2,12 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use crate::paths::release_archive_dir;
 
 /// Handles the `cleanup` command
-pub async fn handle_cleanup(all: bool, days: u32, dry_run: bool) -> Result<()> {
+pub fn handle_cleanup(all: bool, days: u32, dry_run: bool) -> Result<()> {
     let release_archive_dir = release_archive_dir();
     println!(
         "Release archives directory: {}",
@@ -32,8 +32,18 @@ pub async fn handle_cleanup(all: bool, days: u32, dry_run: bool) -> Result<()> {
         } else {
             println!("Removing all release archives in cache directory...");
             if release_archive_dir.exists() {
-                fs::remove_dir_all(&release_archive_dir)?;
-                fs::create_dir_all(&release_archive_dir)?;
+                fs::remove_dir_all(&release_archive_dir).with_context(|| {
+                    format!(
+                        "Cannot remove release archive directory {}",
+                        release_archive_dir.display()
+                    )
+                })?;
+                fs::create_dir_all(&release_archive_dir).with_context(|| {
+                    format!(
+                        "Cannot recreate release archive directory {}",
+                        release_archive_dir.display()
+                    )
+                })?;
             }
             println!("Cache cleared successfully.");
         }
@@ -49,9 +59,19 @@ pub async fn handle_cleanup(all: bool, days: u32, dry_run: bool) -> Result<()> {
 
     // Process release_archive_dir
     if release_archive_dir.exists() {
-        let entries = fs::read_dir(&release_archive_dir)?;
+        let entries = fs::read_dir(&release_archive_dir).with_context(|| {
+            format!(
+                "Cannot read release archive directory {}",
+                release_archive_dir.display()
+            )
+        })?;
         for entry in entries {
-            let entry = entry?;
+            let entry = entry.with_context(|| {
+                format!(
+                    "Cannot read an entry in directory {}",
+                    release_archive_dir.display()
+                )
+            })?;
             let path = entry.path();
 
             if !path.is_file() {
@@ -59,7 +79,8 @@ pub async fn handle_cleanup(all: bool, days: u32, dry_run: bool) -> Result<()> {
             }
 
             // Get file metadata and age
-            let metadata = fs::metadata(&path)?;
+            let metadata = fs::metadata(&path)
+                .with_context(|| format!("Cannot read metadata for {}", path.display()))?;
             let modified_time = metadata.modified()?;
             let age = SystemTime::now().duration_since(modified_time)?;
 
@@ -85,7 +106,8 @@ pub async fn handle_cleanup(all: bool, days: u32, dry_run: bool) -> Result<()> {
                         days_old,
                         format_file_size(file_size)
                     );
-                    fs::remove_file(path)?;
+                    fs::remove_file(&path)
+                        .with_context(|| format!("Cannot remove file {}", path.display()))?;
                 }
             }
         }
@@ -118,12 +140,17 @@ fn calculate_dir_size(dir: &PathBuf) -> Result<u64> {
     }
 
     let mut total_size = 0;
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
+    for entry in
+        fs::read_dir(dir).with_context(|| format!("Cannot read directory {}", dir.display()))?
+    {
+        let entry = entry
+            .with_context(|| format!("Cannot read an entry in directory {}", dir.display()))?;
         let path = entry.path();
 
         if path.is_file() {
-            total_size += fs::metadata(&path)?.len();
+            total_size += fs::metadata(&path)
+                .with_context(|| format!("Cannot read metadata for {}", path.display()))?
+                .len();
         } else if path.is_dir() {
             total_size += calculate_dir_size(&path)?;
         }

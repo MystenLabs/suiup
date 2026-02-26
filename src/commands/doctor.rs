@@ -11,8 +11,8 @@ use crate::component::ComponentManager;
 pub struct Command {}
 
 impl Command {
-    pub async fn exec(&self, github_token: &Option<String>) -> Result<()> {
-        let component_manager = ComponentManager::new(github_token.clone());
+    pub async fn exec(&self, github_token: Option<&str>) -> Result<()> {
+        let component_manager = ComponentManager::new(github_token.map(str::to_owned));
         component_manager.run_doctor_checks().await
     }
 }

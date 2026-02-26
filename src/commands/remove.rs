@@ -6,22 +6,21 @@ use clap::Args;
 
 use crate::handle_commands::handle_cmd;
 
-use super::{BinaryName, ComponentCommands};
+use super::ComponentCommands;
 
 /// Remove one or more binaries.
 #[derive(Args, Debug)]
 pub struct Command {
-    #[arg(value_enum)]
-    binary: BinaryName,
+    binary: String,
 }
 
 impl Command {
-    pub async fn exec(&self, github_token: &Option<String>) -> Result<()> {
+    pub async fn exec(&self, github_token: Option<&str>) -> Result<()> {
         handle_cmd(
             ComponentCommands::Remove {
-                binary: self.binary.to_owned(),
+                binary: self.binary.clone(),
             },
-            github_token.to_owned(),
+            github_token,
         )
         .await
     }

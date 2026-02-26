@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::fs_utils::{read_json_file, write_json_file};
-use anyhow::{Error, anyhow};
+use anyhow::{Context, Error, anyhow};
 use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
@@ -16,37 +16,6 @@ use serde::{Deserialize, Serialize};
 use crate::paths::{default_file_path, installed_binaries_file};
 
 pub type Version = String;
-
-#[derive(Debug)]
-pub enum Repo {
-    Sui,
-    Mvr,
-    Walrus,
-    WalrusSites,
-}
-
-impl Repo {
-    /// Returns the binary name for this repository
-    pub fn binary_name(&self) -> &'static str {
-        match self {
-            Repo::Mvr => "mvr",
-            Repo::Sui => "sui",
-            Repo::Walrus => "walrus",
-            Repo::WalrusSites => "site-builder",
-        }
-    }
-}
-
-impl Display for Repo {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Mvr => write!(f, "MystenLabs/mvr"),
-            Self::Sui => write!(f, "MystenLabs/sui"),
-            Self::Walrus => write!(f, "MystenLabs/walrus"),
-            Self::WalrusSites => write!(f, "MystenLabs/walrus-sites"),
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Release {
@@ -142,9 +111,19 @@ impl InstalledBinaries {
 impl DefaultBinaries {
     pub fn _load() -> Result<DefaultBinaries, Error> {
         let default_file_path = default_file_path()?;
-        let file_content = std::fs::read_to_string(default_file_path)?;
+        let file_content = std::fs::read_to_string(&default_file_path).with_context(|| {
+            format!(
+                "Cannot read default binaries file {}",
+                default_file_path.display()
+            )
+        })?;
         let default_binaries: DefaultBinaries =
-            serde_json::from_str(&file_content).expect("Cannot deserialize default binaries file");
+            serde_json::from_str(&file_content).map_err(|e| {
+                anyhow!(
+                    "Cannot deserialize default binaries file {}: {e}",
+                    default_file_path.display()
+                )
+            })?;
 
         Ok(default_binaries)
     }

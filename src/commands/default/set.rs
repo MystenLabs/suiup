@@ -1,14 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use clap::Args;
 use tracing::{debug, info};
 
 use crate::{
-    commands::{BinaryName, CommandMetadata, parse_component_with_version},
+    commands::{CommandMetadata, parse_component_with_version},
     handlers::{installed_binaries_grouped_by_network, update_default_version_file},
     paths::{binaries_dir, get_default_bin_dir},
+    registry::InstallationType,
 };
 
 #[cfg(not(windows))]
@@ -62,17 +63,19 @@ impl Command {
             version,
         } = parse_component_with_version(name)?;
 
-        let network = if name == BinaryName::Mvr {
-            if let Some(nightly) = nightly {
+        let config = name.config();
+        let network =
+            if !config.network_based || config.installation_type == InstallationType::Standalone {
+                if let Some(nightly) = nightly {
+                    nightly
+                } else {
+                    "standalone"
+                }
+            } else if let Some(nightly) = nightly {
                 nightly
             } else {
-                "standalone"
-            }
-        } else if let Some(nightly) = nightly {
-            nightly
-        } else {
-            &network
-        };
+                &network
+            };
 
         // a map of network --> to BinaryVersion
         let installed_binaries = installed_binaries_grouped_by_network(None)?;
@@ -164,22 +167,40 @@ impl Command {
         #[cfg(not(target_os = "windows"))]
         {
             if dst.exists() {
-                std::fs::remove_file(&dst)?;
+                std::fs::remove_file(&dst).with_context(|| {
+                    format!("Cannot remove existing default binary {}", dst.display())
+                })?;
             }
 
-            std::fs::copy(&src, &dst)?;
+            std::fs::copy(&src, &dst).with_context(|| {
+                format!(
+                    "Cannot copy binary from {} to {}",
+                    src.display(),
+                    dst.display()
+                )
+            })?;
 
             #[cfg(unix)]
             {
-                let mut perms = std::fs::metadata(&dst)?.permissions();
+                let mut perms = std::fs::metadata(&dst)
+                    .with_context(|| format!("Cannot read metadata for {}", dst.display()))?
+                    .permissions();
                 perms.set_mode(0o755);
-                std::fs::set_permissions(&dst, perms)?;
+                std::fs::set_permissions(&dst, perms).with_context(|| {
+                    format!("Cannot set executable permissions on {}", dst.display())
+                })?;
             }
         }
 
         #[cfg(target_os = "windows")]
         {
-            std::fs::copy(&src, &dst)?;
+            std::fs::copy(&src, &dst).with_context(|| {
+                format!(
+                    "Cannot copy binary from {} to {}",
+                    src.display(),
+                    dst.display()
+                )
+            })?;
         }
 
         update_default_version_file(

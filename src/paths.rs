@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Error;
+use anyhow::{Context, Error};
 use std::collections::BTreeMap;
 use std::env;
 use std::fs::{File, create_dir_all};
@@ -115,7 +115,12 @@ pub fn get_default_bin_dir() -> PathBuf {
         let mut path = PathBuf::from(env::var_os("LOCALAPPDATA").expect("LOCALAPPDATA not set"));
         path.push("bin");
         if !path.exists() {
-            std::fs::create_dir_all(&path).unwrap();
+            std::fs::create_dir_all(&path).unwrap_or_else(|e| {
+                panic!(
+                    "Cannot create default bin directory {}: {e}",
+                    path.display()
+                )
+            });
         }
         path
     }
@@ -141,10 +146,22 @@ pub fn get_config_file(name: &str) -> PathBuf {
 pub fn default_file_path() -> Result<PathBuf, Error> {
     let path = get_config_file("default_version.json");
     if !path.exists() {
-        let mut file = File::create(&path)?;
+        if let Some(parent) = path.parent() {
+            create_dir_all(parent).with_context(|| {
+                format!(
+                    "Cannot create parent directory for default file {}",
+                    parent.display()
+                )
+            })?;
+        }
+
+        let mut file = File::create(&path)
+            .with_context(|| format!("Cannot create default version file {}", path.display()))?;
         let default = BTreeMap::<String, (String, String)>::new();
-        let default_str = serde_json::to_string_pretty(&default)?;
-        file.write_all(default_str.as_bytes())?;
+        let default_str = serde_json::to_string_pretty(&default)
+            .context("Cannot serialize default version file content")?;
+        file.write_all(default_str.as_bytes())
+            .with_context(|| format!("Cannot write default version file {}", path.display()))?;
     }
     Ok(path)
 }
@@ -153,6 +170,14 @@ pub fn default_file_path() -> Result<PathBuf, Error> {
 pub fn installed_binaries_file() -> Result<PathBuf, Error> {
     let path = get_config_file("installed_binaries.json");
     if !path.exists() {
+        if let Some(parent) = path.parent() {
+            create_dir_all(parent).with_context(|| {
+                format!(
+                    "Cannot create parent directory for installed binaries file {}",
+                    parent.display()
+                )
+            })?;
+        }
         // We'll need to adjust this reference after moving more code
         InstalledBinaries::create_file(&path)?;
     }
@@ -169,12 +194,36 @@ pub fn binaries_dir() -> PathBuf {
 }
 
 pub fn initialize() -> Result<(), Error> {
-    create_dir_all(get_suiup_config_dir())?;
-    create_dir_all(get_suiup_data_dir())?;
-    create_dir_all(get_suiup_cache_dir())?;
-    create_dir_all(binaries_dir())?;
-    create_dir_all(release_archive_dir())?;
-    create_dir_all(get_default_bin_dir())?;
+    let config_dir = get_suiup_config_dir();
+    create_dir_all(&config_dir)
+        .with_context(|| format!("Cannot create config directory {}", config_dir.display()))?;
+    let data_dir = get_suiup_data_dir();
+    create_dir_all(&data_dir)
+        .with_context(|| format!("Cannot create data directory {}", data_dir.display()))?;
+    let cache_dir = get_suiup_cache_dir();
+    create_dir_all(&cache_dir)
+        .with_context(|| format!("Cannot create cache directory {}", cache_dir.display()))?;
+    let binaries_directory = binaries_dir();
+    create_dir_all(&binaries_directory).with_context(|| {
+        format!(
+            "Cannot create binaries directory {}",
+            binaries_directory.display()
+        )
+    })?;
+    let releases_directory = release_archive_dir();
+    create_dir_all(&releases_directory).with_context(|| {
+        format!(
+            "Cannot create release archive directory {}",
+            releases_directory.display()
+        )
+    })?;
+    let default_bin_dir = get_default_bin_dir();
+    create_dir_all(&default_bin_dir).with_context(|| {
+        format!(
+            "Cannot create default bin directory {}",
+            default_bin_dir.display()
+        )
+    })?;
     default_file_path()?;
     installed_binaries_file()?;
     Ok(())

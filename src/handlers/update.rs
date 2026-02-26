@@ -1,17 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    commands::{BinaryName, CommandMetadata, ComponentCommands, parse_component_with_version},
-    handle_commands::handle_cmd,
-    types::InstalledBinaries,
+use crate::handlers::{
+    available_components, installed_binaries_grouped_by_network,
+    release::{last_release_for_network, release_list},
 };
 use crate::{
-    handlers::{
-        available_components, installed_binaries_grouped_by_network,
-        release::{last_release_for_network, release_list},
-    },
-    types::Repo,
+    commands::{CommandMetadata, ComponentCommands, parse_component_with_version},
+    handle_commands::handle_cmd,
+    registry::InstallationType,
+    types::InstalledBinaries,
 };
 use anyhow::{Error, bail};
 
@@ -31,13 +29,14 @@ pub async fn handle_update(
         bail!("Update should be done without a version. Use `suiup install` to specify a version");
     }
 
-    if !available_components().contains(&name.to_str()) {
+    if !available_components().contains(&name.as_str()) {
         bail!("Invalid component name: {}", name);
     }
 
+    let config = name.config();
     let installed_binaries = InstalledBinaries::new()?;
     let binaries = installed_binaries.binaries();
-    if !binaries.iter().any(|x| x.binary_name == name.to_str()) {
+    if !binaries.iter().any(|x| x.binary_name == name.as_str()) {
         bail!(
             "Binary {name} not found in installed binaries. Use `suiup show` to see installed binaries and `suiup install` to install the binary."
         )
@@ -49,7 +48,7 @@ pub async fn handle_update(
     for (network, binaries) in &binaries_by_network {
         let last_version = binaries
             .iter()
-            .filter(|x| x.binary_name == name.to_str())
+            .filter(|x| x.binary_name == name.as_str())
             .collect::<Vec<_>>();
         if last_version.is_empty() {
             continue;
@@ -64,12 +63,9 @@ pub async fn handle_update(
         };
         network_local_last_version.push((network.clone(), last_version.version.clone()));
     }
-    // map of network and last version known locally
 
-    // find the last local version of the name binary, for each network
-    // then find the last release for each network and compare the versions
-
-    if name == BinaryName::Mvr {
+    // Standalone binaries and non-network-based binaries: just re-install
+    if !config.network_based || config.installation_type == InstallationType::Standalone {
         handle_cmd(
             ComponentCommands::Add {
                 component: binary_name,
@@ -77,27 +73,15 @@ pub async fn handle_update(
                 nightly: None,
                 yes,
             },
-            github_token,
+            github_token.as_deref(),
         )
         .await?;
         return Ok(());
     }
 
-    if name == BinaryName::Walrus {
-        handle_cmd(
-            ComponentCommands::Add {
-                component: binary_name,
-                debug: false,
-                nightly: None,
-                yes,
-            },
-            github_token,
-        )
-        .await?;
-        return Ok(());
-    }
-
-    let releases = release_list(&Repo::Sui, github_token.clone()).await?.0;
+    let releases = release_list(&config.repository, github_token.clone())
+        .await?
+        .0;
     let mut to_update = vec![];
     for (n, v) in &network_local_last_version {
         let last_release = last_release_for_network(&releases, n).await?;
@@ -119,7 +103,7 @@ pub async fn handle_update(
                 nightly: None,
                 yes,
             },
-            github_token.clone(),
+            github_token.as_deref(),
         )
         .await?;
     }

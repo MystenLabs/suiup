@@ -4,12 +4,13 @@
 use super::download::detect_os_arch;
 
 use crate::handlers::download::download_file;
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use std::{fmt::Display, process::Command};
 use tokio::task;
 
 use flate2::read::GzDecoder;
 use serde::Deserialize;
+use serde::de::DeserializeOwned;
 use std::fs::File;
 use tar::Archive;
 use zip::ZipArchive;
@@ -48,29 +49,30 @@ async fn check_for_updates_impl() -> Option<()> {
 
 async fn get_latest_version() -> Result<Ver> {
     let client = reqwest::Client::new();
+    let url = "https://api.github.com/repos/MystenLabs/suiup/releases/latest";
     let response = client
-        .get("https://api.github.com/repos/MystenLabs/suiup/releases/latest")
+        .get(url)
         .header("User-Agent", "suiup")
         .send()
-        .await?;
+        .await
+        .with_context(|| format!("Failed to send request to {url}"))?;
 
     let status = response.status();
     if !status.is_success() {
         let body = response
             .text()
             .await
-            .unwrap_or_else(|_| "Unable to read response body".to_string());
+            .unwrap_or_else(|e| format!("Unable to read response body: {e}"));
         return Err(anyhow!(
-            "Failed to fetch latest version from GitHub (status {}): {}",
+            "Failed to fetch latest version from GitHub (status {}) for {}: {}",
             status,
+            url,
             body
         ));
     }
 
-    let release: GitHubRelease = response
-        .json()
-        .await
-        .map_err(|e| anyhow!("Failed to parse GitHub release response: {}", e))?;
+    let release: GitHubRelease =
+        parse_json_response(response, url, "GitHub latest release").await?;
     Ver::from_str(&release.tag_name)
 }
 
@@ -83,18 +85,16 @@ struct Ver {
 
 impl Ver {
     fn from_str(s: &str) -> Result<Self> {
-        let parts: Vec<&str> = s.split('.').collect();
-        if parts.len() != 3 {
+        let mut parts = s.trim_start_matches('v').split('.');
+        let (Some(major), Some(minor), Some(patch), None) =
+            (parts.next(), parts.next(), parts.next(), parts.next())
+        else {
             return Err(anyhow::anyhow!("Invalid version format"));
-        }
-        let major = if parts[0].starts_with('v') {
-            parts[0][1..].parse::<usize>()?
-        } else {
-            parts[0].parse::<usize>()?
         };
 
-        let minor = parts[1].parse::<usize>()?;
-        let patch = parts[2].parse::<usize>()?;
+        let major = major.parse::<usize>()?;
+        let minor = minor.parse::<usize>()?;
+        let patch = patch.parse::<usize>()?;
         Ok(Ver {
             major,
             minor,
@@ -112,47 +112,25 @@ impl Display for Ver {
 pub async fn handle_update() -> Result<()> {
     // find the current binary version
     let current_exe = std::env::current_exe()?;
-    let current_version = Command::new(&current_exe).arg("--version").output()?.stdout;
-    let current_version = String::from_utf8(current_version)?.trim().to_string();
-
-    if current_version.is_empty() {
-        return Err(anyhow::anyhow!(
-            "Failed to get current version for suiup binary. Please update manually."
-        ));
-    }
-
-    let split = current_version.split(" ").collect::<Vec<_>>();
-
-    if split.len() != 2 {
-        return Err(anyhow::anyhow!(
-            "Failed to parse current version for suiup binary. Please update manually."
-        ));
-    }
-
-    let current_version = Ver::from_str(split[1])?;
-
-    // find the latest version on github in releases
-    let repo = "https://api.github.com/repos/MystenLabs/suiup/releases/latest";
-    let client = reqwest::Client::new();
-    let response = client
-        .get(repo)
-        .header("User-Agent", "suiup")
-        .send()
-        .await?
-        .json::<serde_json::Value>()
-        .await?;
-    let tag = response["tag_name"]
-        .as_str()
-        .ok_or_else(|| anyhow::anyhow!("Failed to parse latest version from GitHub response"))?;
-
-    let latest_version = Ver::from_str(tag)?;
+    let version_output = Command::new(&current_exe).arg("--version").output()?.stdout;
+    let version_output = String::from_utf8(version_output)?;
+    let current_version = version_output
+        .split_whitespace()
+        .nth(1)
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Failed to parse current version for suiup binary. Please update manually."
+            )
+        })
+        .and_then(Ver::from_str)?;
+    let latest_version = get_latest_version().await?;
+    let tag = format!("v{latest_version}");
 
     if current_version == latest_version {
         println!("suiup is already up to date");
         return Ok(());
-    } else {
-        println!("Updating to latest version: {}", latest_version);
     }
+    println!("Updating to latest version: {}", latest_version);
 
     // download the latest version from github
     // https://github.com/MystenLabs/suiup/releases/download/v0.0.1/suiup-Linux-musl-x86_64.tar.gz
@@ -169,35 +147,54 @@ pub async fn handle_update() -> Result<()> {
     if archive_name.ends_with(".zip") {
         // Handle ZIP extraction
         let file = File::open(archive_path.as_path())
-            .map_err(|_| anyhow!("Cannot open archive file: {}", archive_path.display()))?;
+            .with_context(|| format!("Cannot open archive file {}", archive_path.display()))?;
         let mut archive = ZipArchive::new(file)
-            .map_err(|_| anyhow!("Cannot read zip archive: {}", archive_path.display()))?;
+            .with_context(|| format!("Cannot read zip archive {}", archive_path.display()))?;
 
         for i in 0..archive.len() {
-            let mut file = archive
-                .by_index(i)
-                .map_err(|_| anyhow!("Cannot read file from zip archive"))?;
+            let mut file = archive.by_index(i).with_context(|| {
+                format!(
+                    "Cannot read entry at index {} from zip archive {}",
+                    i,
+                    archive_path.display()
+                )
+            })?;
             let outpath = temp_dir.path().join(file.name());
 
             if file.is_dir() {
-                std::fs::create_dir_all(&outpath)?;
+                std::fs::create_dir_all(&outpath).with_context(|| {
+                    format!("Cannot create extraction directory {}", outpath.display())
+                })?;
             } else {
                 if let Some(parent) = outpath.parent() {
-                    std::fs::create_dir_all(parent)?;
+                    std::fs::create_dir_all(parent).with_context(|| {
+                        format!(
+                            "Cannot create parent directory for extraction {}",
+                            parent.display()
+                        )
+                    })?;
                 }
-                let mut outfile = File::create(&outpath)?;
-                std::io::copy(&mut file, &mut outfile)?;
+                let mut outfile = File::create(&outpath).with_context(|| {
+                    format!("Cannot create extracted file {}", outpath.display())
+                })?;
+                std::io::copy(&mut file, &mut outfile).with_context(|| {
+                    format!("Cannot write extracted file {}", outpath.display())
+                })?;
             }
         }
     } else {
         // Handle tar.gz extraction
         let file = File::open(archive_path.as_path())
-            .map_err(|_| anyhow!("Cannot open archive file: {}", archive_path.display()))?;
+            .with_context(|| format!("Cannot open archive file {}", archive_path.display()))?;
         let tar = GzDecoder::new(file);
         let mut archive = Archive::new(tar);
-        archive
-            .unpack(temp_dir.path())
-            .map_err(|_| anyhow!("Cannot unpack archive file: {}", archive_path.display()))?;
+        archive.unpack(temp_dir.path()).with_context(|| {
+            format!(
+                "Cannot unpack archive file {} into {}",
+                archive_path.display(),
+                temp_dir.path().display()
+            )
+        })?;
     }
 
     #[cfg(not(windows))]
@@ -207,7 +204,13 @@ pub async fn handle_update() -> Result<()> {
 
     // replace the current binary with the new one
     let binary_path = temp_dir.path().join(binary);
-    std::fs::copy(binary_path, current_exe)?;
+    std::fs::copy(&binary_path, &current_exe).with_context(|| {
+        format!(
+            "Cannot replace current executable {} with {}",
+            current_exe.display(),
+            binary_path.display()
+        )
+    })?;
 
     println!("suiup updated to version {}", latest_version);
     // cleanup
@@ -218,12 +221,37 @@ pub async fn handle_update() -> Result<()> {
 pub fn handle_uninstall() -> Result<()> {
     let current_exe = std::env::current_exe()?;
     if current_exe.exists() {
-        std::fs::remove_file(current_exe)?;
+        std::fs::remove_file(&current_exe).with_context(|| {
+            format!(
+                "Cannot remove installed executable {}",
+                current_exe.display()
+            )
+        })?;
         println!("suiup uninstalled");
     } else {
         println!("suiup is not installed");
     }
     Ok(())
+}
+
+async fn parse_json_response<T>(
+    response: reqwest::Response,
+    request_url: &str,
+    response_name: &str,
+) -> Result<T>
+where
+    T: DeserializeOwned,
+{
+    let response_body = response
+        .text()
+        .await
+        .with_context(|| format!("Cannot read {response_name} response body from {request_url}"))?;
+
+    serde_json::from_str(&response_body).map_err(|e| {
+        anyhow!(
+            "Failed to deserialize {response_name} response from {request_url}: {e}\nResponse body:\n{response_body}"
+        )
+    })
 }
 
 fn find_archive_name() -> Result<String> {
@@ -331,8 +359,6 @@ mod tests {
         let v2 = Ver::from_str("v1.2.3").unwrap();
         assert!(v1 <= v2);
         assert!(v1 >= v2);
-        assert!(!(v1 < v2));
-        assert!(!(v1 > v2));
 
         // Test complex comparisons
         let v0_0_4 = Ver::from_str("0.0.4").unwrap();
@@ -343,7 +369,7 @@ mod tests {
         // Test the specific case from the bug report
         let current = Ver::from_str("0.0.4").unwrap();
         let latest = Ver::from_str("0.0.3").unwrap();
-        assert!(!(current < latest)); // Current is newer, should not show warning
+        assert!(current >= latest); // Current is newer, should not show warning
         assert!(latest < current); // Latest is older than current
     }
 

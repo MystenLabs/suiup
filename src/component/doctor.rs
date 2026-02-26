@@ -163,18 +163,22 @@ fn check_config_files(check: &mut impl FnMut(&str, Result<String, String>)) {
                 match std::fs::read_to_string(&path) {
                     Ok(content) => {
                         let result: Result<serde_json::Value, _> = serde_json::from_str(&content);
-                        if result.is_ok() {
-                            check("Default version config", Ok("is valid".to_string()));
-                        } else {
+                        if let Err(e) = result {
                             check(
                                 "Default version config",
-                                Err("ERROR: Failed to parse as valid JSON.".to_string()),
+                                Err(format!(
+                                    "ERROR: Failed to parse {} as valid JSON: {}",
+                                    path.display(),
+                                    e
+                                )),
                             );
+                        } else {
+                            check("Default version config", Ok("is valid".to_string()));
                         }
                     }
                     Err(e) => check(
                         "Default version config",
-                        Err(format!("ERROR: Failed to read: {}", e)),
+                        Err(format!("ERROR: Failed to read {}: {}", path.display(), e)),
                     ),
                 }
             }

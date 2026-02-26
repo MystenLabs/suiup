@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use anyhow::Result;
+use anyhow::{Context, Result, anyhow};
 use clap::Args;
 
 use crate::{
@@ -19,8 +19,16 @@ pub struct Command;
 
 impl Command {
     pub fn exec(&self) -> Result<()> {
-        let default = std::fs::read_to_string(default_file_path()?)?;
-        let default: BTreeMap<String, (String, Version, bool)> = serde_json::from_str(&default)?;
+        let default_path = default_file_path()?;
+        let default = std::fs::read_to_string(&default_path)
+            .with_context(|| format!("Cannot read default file {}", default_path.display()))?;
+        let default: BTreeMap<String, (String, Version, bool)> = serde_json::from_str(&default)
+            .map_err(|e| {
+                anyhow!(
+                    "Cannot deserialize default file {}: {e}",
+                    default_path.display()
+                )
+            })?;
         let binaries = Binaries::from(default);
 
         println!("\x1b[1mDefault binaries:\x1b[0m");

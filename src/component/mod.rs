@@ -6,11 +6,10 @@ mod install;
 mod list;
 mod remove;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 
-use crate::commands::{
-    BinaryName, CommandMetadata, ComponentCommands, parse_component_with_version,
-};
+use crate::commands::{CommandMetadata, ComponentCommands, parse_component_with_version};
+use crate::registry::BinaryRegistry;
 
 /// ComponentManager handles all component-related operations
 pub struct ComponentManager {
@@ -27,7 +26,7 @@ impl ComponentManager {
     pub async fn handle_command(&self, cmd: ComponentCommands) -> Result<()> {
         match cmd {
             ComponentCommands::Doctor => self.run_doctor_checks().await,
-            ComponentCommands::List => self.list_components().await,
+            ComponentCommands::List => self.list_components(),
             ComponentCommands::Add {
                 component,
                 nightly,
@@ -38,16 +37,25 @@ impl ComponentManager {
                 self.install_component(command_metadata, nightly, debug, yes)
                     .await
             }
-            ComponentCommands::Remove { binary } => self.remove_component(binary).await,
+            ComponentCommands::Remove { binary } => {
+                // Validate binary name against registry
+                if !BinaryRegistry::global().contains(&binary) {
+                    bail!(
+                        "Unknown binary: {}. Use `suiup list` to see available binaries.",
+                        binary
+                    );
+                }
+                self.remove_component(&binary)
+            }
             ComponentCommands::Cleanup { all, days, dry_run } => {
-                self.handle_cleanup(all, days, dry_run).await
+                self.handle_cleanup(all, days, dry_run)
             }
         }
     }
 
     /// List all available components
-    async fn list_components(&self) -> Result<()> {
-        list::list_components().await
+    fn list_components(&self) -> Result<()> {
+        list::list_components()
     }
 
     /// Install a component
@@ -76,8 +84,8 @@ impl ComponentManager {
     }
 
     /// Remove a component
-    async fn remove_component(&self, binary: BinaryName) -> Result<()> {
-        remove::remove_component(binary).await
+    fn remove_component(&self, binary: &str) -> Result<()> {
+        remove::remove_component(binary)
     }
 
     /// Run diagnostic checks on the environment
@@ -86,7 +94,7 @@ impl ComponentManager {
     }
 
     /// Handle cleanup operations
-    async fn handle_cleanup(&self, all: bool, days: u32, dry_run: bool) -> Result<()> {
-        crate::handlers::cleanup::handle_cleanup(all, days, dry_run).await
+    fn handle_cleanup(&self, all: bool, days: u32, dry_run: bool) -> Result<()> {
+        crate::handlers::cleanup::handle_cleanup(all, days, dry_run)
     }
 }
