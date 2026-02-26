@@ -1,0 +1,9 @@
+name = "walrus"
+description = "Walrus CLI"
+repository = "MystenLabs/walrus"
+main_branch = "main"
+installation_type = "archive"
+network_based = true
+supported_networks = ["testnet", "devnet", "mainnet"]
+default_network = "testnet"
+cargo_package = "walrus-service"

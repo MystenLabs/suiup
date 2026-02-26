@@ -1,0 +1,6 @@
+name = "mvr"
+description = "MVR CLI"
+repository = "MystenLabs/mvr"
+main_branch = "main"
+installation_type = "standalone"
+network_based = false

@@ -6,9 +6,10 @@ use clap::Args;
 use tracing::{debug, info};
 
 use crate::{
-    commands::{BinaryName, CommandMetadata, parse_component_with_version},
+    commands::{CommandMetadata, parse_component_with_version},
     handlers::{installed_binaries_grouped_by_network, update_default_version_file},
     paths::{binaries_dir, get_default_bin_dir},
+    registry::InstallationType,
 };
 
 #[cfg(not(windows))]
@@ -62,17 +63,19 @@ impl Command {
             version,
         } = parse_component_with_version(name)?;
 
-        let network = if name == BinaryName::Mvr {
-            if let Some(nightly) = nightly {
+        let config = name.config();
+        let network =
+            if !config.network_based || config.installation_type == InstallationType::Standalone {
+                if let Some(nightly) = nightly {
+                    nightly
+                } else {
+                    "standalone"
+                }
+            } else if let Some(nightly) = nightly {
                 nightly
             } else {
-                "standalone"
-            }
-        } else if let Some(nightly) = nightly {
-            nightly
-        } else {
-            &network
-        };
+                &network
+            };
 
         // a map of network --> to BinaryVersion
         let installed_binaries = installed_binaries_grouped_by_network(None)?;

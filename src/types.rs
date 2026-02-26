@@ -17,40 +17,6 @@ use crate::paths::{default_file_path, installed_binaries_file};
 
 pub type Version = String;
 
-#[derive(Debug, Clone, Copy)]
-pub enum Repo {
-    Sui,
-    Mvr,
-    Walrus,
-    WalrusSites,
-    Signers,
-}
-
-impl Repo {
-    /// Returns the binary name for this repository
-    pub fn binary_name(&self) -> &'static str {
-        match self {
-            Repo::Mvr => "mvr",
-            Repo::Sui => "sui",
-            Repo::Walrus => "walrus",
-            Repo::WalrusSites => "site-builder",
-            Repo::Signers => "signers",
-        }
-    }
-}
-
-impl Display for Repo {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Mvr => write!(f, "MystenLabs/mvr"),
-            Self::Sui => write!(f, "MystenLabs/sui"),
-            Self::Walrus => write!(f, "MystenLabs/walrus"),
-            Self::WalrusSites => write!(f, "MystenLabs/walrus-sites"),
-            Self::Signers => write!(f, "MystenLabs/rust-signers"),
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Release {
     pub assets: Vec<Asset>,

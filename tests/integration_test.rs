@@ -38,14 +38,27 @@ mod tests {
         cmd.env(DATA_HOME, &test_env.data_dir)
             .env(CONFIG_HOME, &test_env.config_dir)
             .env(CACHE_HOME, &test_env.cache_dir)
-            .env(HOME, test_env.temp_dir.path());
-
-        // Pass through GITHUB_TOKEN if set
-        if let Ok(token) = std::env::var("GITHUB_TOKEN") {
-            cmd.env("GITHUB_TOKEN", token);
-        }
+            .env(HOME, test_env.temp_dir.path())
+            .env_remove("GITHUB_TOKEN");
 
         cmd
+    }
+
+    fn github_is_reachable() -> bool {
+        use std::net::{TcpStream, ToSocketAddrs};
+
+        let addrs = match ("github.com", 443).to_socket_addrs() {
+            Ok(addrs) => addrs,
+            Err(_) => return false,
+        };
+
+        for addr in addrs {
+            if TcpStream::connect_timeout(&addr, Duration::from_secs(2)).is_ok() {
+                return true;
+            }
+        }
+
+        false
     }
 
     #[tokio::test]
@@ -70,8 +83,10 @@ mod tests {
 
         // OK: nightly + debug
         // OK: nightly (if nightly + debug work, nightly works on its own too)
-        let mut cmd = suiup_command(vec!["install", "mvr", "--nightly", "--debug"], &test_env);
-        cmd.assert().success();
+        if github_is_reachable() {
+            let mut cmd = suiup_command(vec!["install", "mvr", "--nightly", "--debug"], &test_env);
+            cmd.assert().success();
+        }
 
         Ok(())
     }
@@ -184,8 +199,7 @@ mod tests {
                 .stdout(predicate::str::contains("1.39.3"));
         }
 
-        let mut cmd = Command::cargo_bin("suiup")?;
-        cmd.arg("default").arg("get");
+        let mut cmd = suiup_command(vec!["default", "get"], &test_env);
         cmd.assert()
             .success()
             .stdout(predicate::str::contains("Yes"));
@@ -304,6 +318,9 @@ mod tests {
         let version = version[0];
 
         // Install from main branch
+        if !github_is_reachable() {
+            return Ok(());
+        }
         let mut cmd = suiup_command(vec!["install", "mvr", "--nightly", "-y"], &test_env);
         cmd.assert().success();
 

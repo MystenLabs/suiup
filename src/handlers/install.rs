@@ -6,12 +6,12 @@ use std::process::{Command, Stdio};
 
 use super::check_if_binaries_exist;
 use super::version::extract_version_from_release;
-use crate::commands::BinaryName;
 use crate::handlers::download::{download_latest_release, download_release_at_version};
 use crate::handlers::{extract_component, update_after_install};
 use crate::paths::binaries_dir;
+use crate::registry::{BinaryConfig, BinaryName};
 use crate::standalone;
-use crate::types::{BinaryVersion, InstalledBinaries, Repo};
+use crate::types::{BinaryVersion, InstalledBinaries};
 use anyhow::Context;
 use anyhow::Error;
 use anyhow::anyhow;
@@ -40,21 +40,22 @@ pub fn install_binary(
     Ok(())
 }
 
-// this is used for sui mostly
 pub async fn install_from_release(
     name: &str,
     network: &str,
     version_spec: Option<String>,
     debug: bool,
     yes: bool,
-    repo: Repo,
+    config: &BinaryConfig,
     github_token: Option<String>,
 ) -> Result<(), Error> {
+    let repo_slug = &config.repository;
     let filename = match version_spec {
         Some(version) => {
-            download_release_at_version(repo, network, &version, github_token.clone()).await?
+            download_release_at_version(repo_slug, config, network, &version, github_token.clone())
+                .await?
         }
-        None => download_latest_release(repo, network, github_token.clone()).await?,
+        None => download_latest_release(repo_slug, config, network, github_token.clone()).await?,
     };
 
     let version = extract_version_from_release(&filename)?;
@@ -90,6 +91,7 @@ pub async fn install_from_nightly(
     debug: bool,
     yes: bool,
 ) -> Result<(), Error> {
+    let config = name.config();
     println!("Installing {name} from {branch} branch");
     check_command_installed("rustc")?;
     check_command_installed("cargo")?;
@@ -103,31 +105,51 @@ pub async fn install_from_nightly(
     pb.enable_steady_tick(Duration::from_millis(100));
     pb.set_message("Compiling...please wait");
 
-    let repo_url = name.repo_url();
+    let repo_url = config.repo_url();
     let binaries_folder = binaries_dir();
     let binaries_folder_branch = binaries_folder.join(branch);
 
     let mut args = vec![];
 
-    if name == &BinaryName::LedgerSigner {
-        args.push("+nightly");
+    if let Some(toolchain) = &config.nightly_toolchain {
+        args.push(format!("+{}", toolchain));
     }
 
-    args.extend(vec![
-        "install", "--locked", "--force", "--git", repo_url, "--branch", branch,
-    ]);
+    let args_static: Vec<&str> = vec![
+        "install", "--locked", "--force", "--git", &repo_url, "--branch", branch,
+    ];
 
-    if name == &BinaryName::Walrus {
-        args.push("walrus-service");
-        args.push("--bin");
-        args.push("walrus");
+    if let Some(cargo_package) = &config.cargo_package {
+        args.push(cargo_package.clone());
+        args.push("--bin".to_string());
+        args.push(name.as_str().to_string());
     } else {
-        args.push(name.to_str());
+        args.push(name.as_str().to_string());
     };
 
-    args.extend(vec!["--root", binaries_folder_branch.to_str().unwrap()]);
+    args.push("--root".to_string());
+    args.push(binaries_folder_branch.to_str().unwrap().to_string());
+
+    let all_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    // Merge static args with dynamic args
+    let mut final_args: Vec<&str> = Vec::new();
+    // Add toolchain first if present
+    if config.nightly_toolchain.is_some() {
+        final_args.push(all_args[0]);
+    }
+    final_args.extend(args_static.iter());
+    // Add remaining dynamic args (skip toolchain if it was present)
+    let skip = if config.nightly_toolchain.is_some() {
+        1
+    } else {
+        0
+    };
+    for arg in all_args.iter().skip(skip) {
+        final_args.push(arg);
+    }
+
     let mut cmd = Command::new("cargo");
-    cmd.args(&args);
+    cmd.args(&final_args);
 
     let cmd = cmd
         .stdout(Stdio::inherit())
@@ -144,7 +166,7 @@ pub async fn install_from_nightly(
 
     println!("Installation completed successfully!");
     // bin folder is needed because cargo installs in  /folder/bin/binary_name.
-    let orig_binary_path = binaries_folder_branch.join("bin").join(name.to_str());
+    let orig_binary_path = binaries_folder_branch.join("bin").join(name.as_str());
 
     // rename the binary to `binary_name-nightly`, to keep things in sync across the board
 
@@ -169,7 +191,7 @@ pub async fn install_from_nightly(
         )
     })?;
     install_binary(
-        name.to_str(),
+        name.as_str(),
         branch.to_string(),
         "nightly",
         debug,
@@ -182,15 +204,15 @@ pub async fn install_from_nightly(
 
 pub async fn install_standalone(
     version: Option<String>,
-    repo: Repo,
-    binary: Option<BinaryName>,
+    config: &BinaryConfig,
+    binary_name_override: Option<&str>,
     yes: bool,
     github_token: Option<String>,
 ) -> Result<(), Error> {
     let network = "standalone".to_string();
-    let binary_name = match binary {
-        Some(b) => b.to_str().to_string(),
-        None => repo.binary_name().to_string(),
+    let binary_name = match binary_name_override {
+        Some(name) => name.to_string(),
+        None => config.name.clone(),
     };
 
     if !check_if_binaries_exist(
@@ -198,7 +220,7 @@ pub async fn install_standalone(
         network.clone(),
         &version.clone().unwrap_or_default(),
     )? {
-        let mut installer = standalone::StandaloneInstaller::new(repo, github_token);
+        let mut installer = standalone::StandaloneInstaller::new(&config.repository, github_token);
         let installed_version = installer.download_version(version, &binary_name).await?;
 
         println!("Adding binary: {binary_name}-{installed_version}");

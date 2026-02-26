@@ -7,6 +7,7 @@ pub mod fs_utils;
 pub mod handle_commands;
 pub mod handlers;
 pub mod paths;
+pub mod registry;
 pub mod standalone;
 pub mod types;
 

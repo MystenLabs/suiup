@@ -6,9 +6,10 @@ mod tests {
     use anyhow::Result;
     use std::fs;
     use std::time::{Duration, SystemTime};
-    use suiup::commands::{BinaryName, CommandMetadata, parse_component_with_version};
+    use suiup::commands::{CommandMetadata, parse_component_with_version};
     use suiup::handlers::cleanup::handle_cleanup;
     use suiup::paths;
+    use suiup::registry::BinaryName;
     use suiup::set_env_var;
     use tempfile::TempDir;
 
@@ -16,7 +17,7 @@ mod tests {
     fn test_parse_component_with_version() -> Result<(), anyhow::Error> {
         let result = parse_component_with_version("sui")?;
         let expected = CommandMetadata {
-            name: BinaryName::Sui,
+            name: BinaryName::new("sui").unwrap(),
             network: "testnet".to_string(),
             version: None,
         };
@@ -24,7 +25,7 @@ mod tests {
 
         let result = parse_component_with_version("sui@testnet-v1.39.3")?;
         let expected = CommandMetadata {
-            name: BinaryName::Sui,
+            name: BinaryName::new("sui").unwrap(),
             network: "testnet".to_string(),
             version: Some("v1.39.3".to_string()),
         };
@@ -32,7 +33,7 @@ mod tests {
 
         let result = parse_component_with_version("walrus")?;
         let expected = CommandMetadata {
-            name: BinaryName::Walrus,
+            name: BinaryName::new("walrus").unwrap(),
             network: "testnet".to_string(),
             version: None,
         };
@@ -40,7 +41,7 @@ mod tests {
 
         let result = parse_component_with_version("mvr")?;
         let expected = CommandMetadata {
-            name: BinaryName::Mvr,
+            name: BinaryName::new("mvr").unwrap(),
             network: "testnet".to_string(),
             version: None,
         };
@@ -59,9 +60,9 @@ mod tests {
 
     #[test]
     fn test_sui_component_display() {
-        assert_eq!(BinaryName::Sui.to_string(), "sui");
-        assert_eq!(BinaryName::Mvr.to_string(), "mvr");
-        assert_eq!(BinaryName::Walrus.to_string(), "walrus");
+        assert_eq!(BinaryName::new("sui").unwrap().to_string(), "sui");
+        assert_eq!(BinaryName::new("mvr").unwrap().to_string(), "mvr");
+        assert_eq!(BinaryName::new("walrus").unwrap().to_string(), "walrus");
     }
 
     #[tokio::test]

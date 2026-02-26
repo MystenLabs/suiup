@@ -1,0 +1,8 @@
+name = "site-builder"
+description = "Walrus Sites Builder"
+repository = "MystenLabs/walrus-sites"
+main_branch = "main"
+installation_type = "archive"
+network_based = true
+supported_networks = ["mainnet"]
+default_network = "mainnet"

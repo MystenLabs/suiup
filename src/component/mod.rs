@@ -6,11 +6,10 @@ mod install;
 mod list;
 mod remove;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 
-use crate::commands::{
-    BinaryName, CommandMetadata, ComponentCommands, parse_component_with_version,
-};
+use crate::commands::{CommandMetadata, ComponentCommands, parse_component_with_version};
+use crate::registry::BinaryRegistry;
 
 /// ComponentManager handles all component-related operations
 pub struct ComponentManager {
@@ -38,7 +37,16 @@ impl ComponentManager {
                 self.install_component(command_metadata, nightly, debug, yes)
                     .await
             }
-            ComponentCommands::Remove { binary } => self.remove_component(binary).await,
+            ComponentCommands::Remove { binary } => {
+                // Validate binary name against registry
+                if !BinaryRegistry::global().contains(&binary) {
+                    bail!(
+                        "Unknown binary: {}. Use `suiup list` to see available binaries.",
+                        binary
+                    );
+                }
+                self.remove_component(&binary).await
+            }
             ComponentCommands::Cleanup { all, days, dry_run } => {
                 self.handle_cleanup(all, days, dry_run).await
             }
@@ -76,7 +84,7 @@ impl ComponentManager {
     }
 
     /// Remove a component
-    async fn remove_component(&self, binary: BinaryName) -> Result<()> {
+    async fn remove_component(&self, binary: &str) -> Result<()> {
         remove::remove_component(binary).await
     }
 

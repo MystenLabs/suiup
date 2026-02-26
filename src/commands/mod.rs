@@ -13,10 +13,11 @@ mod switch;
 mod update;
 mod which;
 
+pub use crate::registry::BinaryName;
 use crate::{handlers::self_::check_for_updates, types::BinaryVersion};
 
 use anyhow::{Result, anyhow, bail};
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 use comfy_table::Table;
 pub const TABLE_FORMAT: &str = "  ── ══      ──    ";
 #[derive(Parser)]
@@ -119,10 +120,7 @@ pub enum ComponentCommands {
     #[command(
         about = "Remove one. By default, the binary from each release will be removed. Use --version to specify which exact version to remove"
     )]
-    Remove {
-        #[arg(value_enum)]
-        binary: BinaryName,
-    },
+    Remove { binary: String },
     #[command(about = "Cleanup cache files")]
     Cleanup {
         /// Remove all cache files
@@ -138,87 +136,11 @@ pub enum ComponentCommands {
     },
 }
 
-#[derive(Clone, Debug, PartialEq, Hash, Eq, ValueEnum)]
-#[value(rename_all = "lowercase")]
-pub enum BinaryName {
-    #[value(name = "mvr")]
-    Mvr,
-    #[value(name = "sui")]
-    Sui,
-    #[value(name = "walrus")]
-    Walrus,
-    #[value(name = "site-builder")]
-    WalrusSites,
-    #[value(name = "move-analyzer")]
-    MoveAnalyzer,
-    #[value(name = "ledger-signer")]
-    LedgerSigner,
-    #[value(name = "yubikey-signer")]
-    YubikeySigner,
-}
-
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct CommandMetadata {
     pub name: BinaryName,
     pub network: String,
     pub version: Option<String>,
-}
-
-impl BinaryName {
-    pub fn repo_url(&self) -> &str {
-        match self {
-            BinaryName::Mvr => "https://github.com/MystenLabs/mvr",
-            BinaryName::Walrus => "https://github.com/MystenLabs/walrus",
-            BinaryName::WalrusSites => "https://github.com/MystenLabs/walrus-sites",
-            BinaryName::LedgerSigner | BinaryName::YubikeySigner => {
-                "https://github.com/MystenLabs/rust-signers"
-            }
-            _ => "https://github.com/MystenLabs/sui",
-        }
-    }
-
-    pub fn to_str(&self) -> &str {
-        match self {
-            BinaryName::Mvr => "mvr",
-            BinaryName::Sui => "sui",
-            BinaryName::Walrus => "walrus",
-            BinaryName::WalrusSites => "site-builder",
-            BinaryName::MoveAnalyzer => "move-analyzer",
-            BinaryName::LedgerSigner => "ledger-signer",
-            BinaryName::YubikeySigner => "yubikey-signer",
-        }
-    }
-}
-
-impl std::fmt::Display for BinaryName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BinaryName::Mvr => write!(f, "mvr"),
-            BinaryName::Sui => write!(f, "sui"),
-            BinaryName::Walrus => write!(f, "walrus"),
-            BinaryName::WalrusSites => write!(f, "site-builder"),
-            BinaryName::MoveAnalyzer => write!(f, "move-analyzer"),
-            BinaryName::LedgerSigner => write!(f, "ledger-signer"),
-            BinaryName::YubikeySigner => write!(f, "yubikey-signer"),
-        }
-    }
-}
-
-impl std::str::FromStr for BinaryName {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "sui" => Ok(BinaryName::Sui),
-            "mvr" => Ok(BinaryName::Mvr),
-            "walrus" => Ok(BinaryName::Walrus),
-            "site-builder" => Ok(BinaryName::WalrusSites),
-            "move-analyzer" => Ok(BinaryName::MoveAnalyzer),
-            "ledger-signer" => Ok(BinaryName::LedgerSigner),
-            "yubikey-signer" => Ok(BinaryName::YubikeySigner),
-            _ => Err(format!("Unknown binary: {}", s)),
-        }
-    }
 }
 
 pub fn parse_component_with_version(s: &str) -> Result<CommandMetadata, anyhow::Error> {
@@ -237,7 +159,7 @@ pub fn parse_component_with_version(s: &str) -> Result<CommandMetadata, anyhow::
 
     match parts.len() {
         1 => {
-            let component = BinaryName::from_str(parts[0], true)
+            let component = BinaryName::new(parts[0])
                 .map_err(|_| anyhow!("Invalid binary name: {}. Use `suiup list` to find available binaries to install or `suiup show` to see which binaries are already installed.\nWhen specifying versions, use @, e.g.: sui@v1.60.0\n\nMore information in the docs: https://github.com/mystenLabs/suiup?tab=readme-ov-file#switch-between-versions-note-that-default-set-requires-to-specify-a-version", parts[0]))?;
             let (network, version) = parse_version_spec(None)?;
             let component_metadata = CommandMetadata {
@@ -248,7 +170,7 @@ pub fn parse_component_with_version(s: &str) -> Result<CommandMetadata, anyhow::
             Ok(component_metadata)
         }
         2 => {
-            let component = BinaryName::from_str(parts[0], true)
+            let component = BinaryName::new(parts[0])
                 .map_err(|_| anyhow!("Invalid binary name: {}. Use `suiup list` to find available binaries to install or `suiup show` to see which binaries are already installed.\nWhen specifying versions, use `@`, e.g.: sui@v1.60.0\n\nMore information in the docs: https://github.com/mystenLabs/suiup?tab=readme-ov-file#switch-between-versions-note-that-default-set-requires-to-specify-a-version", parts[0]))?;
             if parts[1].is_empty() {
                 bail!(

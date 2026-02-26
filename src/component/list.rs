@@ -2,20 +2,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::commands::TABLE_FORMAT;
+use crate::registry::BinaryRegistry;
 use anyhow::Result;
 use comfy_table::*;
 
 /// List all available components
 pub async fn list_components() -> Result<()> {
-    let components = crate::handlers::available_components();
+    let registry = BinaryRegistry::global();
     let mut table = Table::new();
     table
         .load_preset(TABLE_FORMAT)
-        .set_header(vec![Cell::new("Available Binaries to Install")])
+        .set_header(vec![Cell::new("Binary"), Cell::new("Description")])
         .add_rows(
-            components
+            registry
+                .all()
                 .iter()
-                .map(|component| vec![Cell::new(component)])
+                .map(|config| vec![Cell::new(&config.name), Cell::new(&config.description)])
                 .collect::<Vec<Vec<Cell>>>(),
         );
     println!("{table}");

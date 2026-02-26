@@ -6,13 +6,12 @@ use clap::Args;
 
 use crate::handle_commands::handle_cmd;
 
-use super::{BinaryName, ComponentCommands};
+use super::ComponentCommands;
 
 /// Remove one or more binaries.
 #[derive(Args, Debug)]
 pub struct Command {
-    #[arg(value_enum)]
-    binary: BinaryName,
+    binary: String,
 }
 
 impl Command {
