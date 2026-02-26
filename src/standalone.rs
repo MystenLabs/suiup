@@ -1,23 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// use crate::handle_commands::{binaries_folder, detect_os_arch, download_file};
 use crate::{
     handlers::download::{detect_os_arch, download_file},
-    paths::binaries_dir,
-    types::Repo,
+    paths::{binaries_dir, get_suiup_cache_dir},
 };
 use anyhow::{Context, Error, anyhow};
-use serde::Deserialize;
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct StandaloneRelease {
     pub tag_name: String,
     pub assets: Vec<StandaloneAsset>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct StandaloneAsset {
     pub name: String,
     pub browser_download_url: String,
@@ -25,22 +23,22 @@ pub struct StandaloneAsset {
 
 pub struct StandaloneInstaller {
     releases: Vec<StandaloneRelease>,
-    repo: Repo,
+    repo_slug: String,
     github_token: Option<String>,
 }
 
 impl StandaloneInstaller {
-    pub fn new(repo: Repo, github_token: Option<String>) -> Self {
+    pub fn new(repo_slug: &str, github_token: Option<String>) -> Self {
         Self {
             releases: Vec::new(),
-            repo,
+            repo_slug: repo_slug.to_string(),
             github_token,
         }
     }
 
     pub async fn get_releases(&mut self) -> Result<(), Error> {
         let client = reqwest::Client::new();
-        let url = format!("https://api.github.com/repos/{}/releases", self.repo);
+        let url = format!("https://api.github.com/repos/{}/releases", self.repo_slug);
 
         if !self.releases.is_empty() {
             return Ok(());
@@ -51,13 +49,23 @@ impl StandaloneInstaller {
             request = request.header("Authorization", format!("token {}", token));
         }
 
-        let response = request
-            .send()
-            .await
-            .with_context(|| format!("Failed to send request to {url}"))?;
+        let response = match request.send().await {
+            Ok(response) => response,
+            Err(err) => {
+                if let Some(cached) = load_cached_standalone_releases(&self.repo_slug)? {
+                    self.releases = cached;
+                    return Ok(());
+                }
+                return Err(err).with_context(|| format!("Failed to send request to {url}"));
+            }
+        };
 
         let status = response.status();
         if !status.is_success() {
+            if let Some(cached) = load_cached_standalone_releases(&self.repo_slug)? {
+                self.releases = cached;
+                return Ok(());
+            }
             let body = response
                 .text()
                 .await
@@ -72,6 +80,7 @@ impl StandaloneInstaller {
 
         let releases: Vec<StandaloneRelease> =
             parse_json_response(response, &url, "GitHub releases list").await?;
+        save_cached_standalone_releases(&self.repo_slug, &releases)?;
         self.releases = releases;
         Ok(())
     }
@@ -81,7 +90,7 @@ impl StandaloneInstaller {
         let releases = &self.releases;
         releases
             .first()
-            .ok_or_else(|| anyhow!("No {} releases found", self.repo.binary_name()))
+            .ok_or_else(|| anyhow!("No releases found for {}", self.repo_slug))
     }
 
     /// Download the CLI binary, if it does not exist in the binary folder.
@@ -182,6 +191,55 @@ impl StandaloneInstaller {
     }
 }
 
+fn standalone_releases_cache_file(repo_slug: &str) -> std::path::PathBuf {
+    let sanitized = repo_slug.replace('/', "_");
+    get_suiup_cache_dir().join(format!("standalone_releases_{sanitized}.json"))
+}
+
+fn load_cached_standalone_releases(
+    repo_slug: &str,
+) -> Result<Option<Vec<StandaloneRelease>>, Error> {
+    let cache_file = standalone_releases_cache_file(repo_slug);
+    if !cache_file.exists() {
+        return Ok(None);
+    }
+
+    let raw = std::fs::read_to_string(&cache_file)
+        .with_context(|| format!("Cannot read standalone cache file {}", cache_file.display()))?;
+    let releases = serde_json::from_str(&raw).with_context(|| {
+        format!(
+            "Cannot deserialize standalone cache file {}",
+            cache_file.display()
+        )
+    })?;
+    Ok(Some(releases))
+}
+
+fn save_cached_standalone_releases(
+    repo_slug: &str,
+    releases: &[StandaloneRelease],
+) -> Result<(), Error> {
+    let cache_file = standalone_releases_cache_file(repo_slug);
+    if let Some(parent) = cache_file.parent() {
+        std::fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "Cannot create standalone cache directory {}",
+                parent.display()
+            )
+        })?;
+    }
+
+    let payload = serde_json::to_string_pretty(releases)
+        .context("Cannot serialize standalone releases cache payload")?;
+    std::fs::write(&cache_file, payload).with_context(|| {
+        format!(
+            "Cannot write standalone cache file {}",
+            cache_file.display()
+        )
+    })?;
+    Ok(())
+}
+
 async fn parse_json_response<T>(
     response: reqwest::Response,
     request_url: &str,
@@ -205,11 +263,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::StandaloneInstaller;
-    use crate::types::Repo;
 
     #[test]
     fn standalone_installer_stores_github_token() {
-        let installer = StandaloneInstaller::new(Repo::Mvr, Some("token123".to_string()));
+        let installer = StandaloneInstaller::new("MystenLabs/mvr", Some("token123".to_string()));
         assert_eq!(installer.github_token.as_deref(), Some("token123"));
     }
 }

@@ -7,19 +7,18 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use tracing::debug;
 
-use crate::commands::BinaryName;
 use crate::fs_utils::{read_json_file, write_json_file};
 use crate::paths::{default_file_path, get_default_bin_dir};
 use crate::types::InstalledBinaries;
 
 /// Remove a component and its associated files
-pub async fn remove_component(binary: BinaryName) -> Result<()> {
+pub fn remove_component(binary: &str) -> Result<()> {
     let mut installed_binaries = InstalledBinaries::new()?;
 
     let binaries_to_remove = installed_binaries
         .binaries()
         .iter()
-        .filter(|b| binary.to_string() == b.binary_name)
+        .filter(|b| binary == b.binary_name)
         .collect::<Vec<_>>();
 
     if binaries_to_remove.is_empty() {
@@ -61,8 +60,8 @@ pub async fn remove_component(binary: BinaryName) -> Result<()> {
         .map(|x| &x.binary_name)
         .collect::<HashSet<_>>();
 
-    for binary in default_binaries_to_remove {
-        let default_bin_path = get_default_bin_dir().join(binary);
+    for bin_name in default_binaries_to_remove {
+        let default_bin_path = get_default_bin_dir().join(bin_name);
         if default_bin_path.exists() {
             std::fs::remove_file(&default_bin_path)
                 .with_context(|| format!("Cannot remove file {}", default_bin_path.display()))?;
@@ -72,15 +71,15 @@ pub async fn remove_component(binary: BinaryName) -> Result<()> {
             );
         }
 
-        default_binaries.remove(binary);
-        debug!("Removed {binary} from default binaries JSON file");
+        default_binaries.remove(bin_name);
+        debug!("Removed {bin_name} from default binaries JSON file");
     }
 
     // Update default binaries file
     write_json_file(&default_file, &default_binaries)?;
 
     // Update installed binaries metadata
-    installed_binaries.remove_binary(&binary.to_string());
+    installed_binaries.remove_binary(binary);
     debug!("Removed {binary} from installed_binaries JSON file. Saving updated data");
     installed_binaries.save_to_file()?;
 

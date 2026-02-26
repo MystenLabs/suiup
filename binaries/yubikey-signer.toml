@@ -1,0 +1,12 @@
+name = "yubikey-signer"
+description = "YubiKey Signer"
+repository = "MystenLabs/rust-signers"
+main_branch = "main"
+installation_type = "standalone"
+network_based = false
+supported_networks = []
+default_network = "standalone"
+supports_debug = false
+cargo_package = ""
+nightly_toolchain = ""
+shared_repo_binary = true

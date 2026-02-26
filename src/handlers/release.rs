@@ -11,14 +11,13 @@ use serde::de::DeserializeOwned;
 use crate::handlers::version::extract_version_from_release;
 use crate::paths::get_suiup_cache_dir;
 use crate::types::Release;
-use crate::types::Repo;
 
 /// Fetches the list of releases from the GitHub repository
 pub async fn release_list(
-    repo: &Repo,
+    repo_slug: &str,
     github_token: Option<String>,
 ) -> Result<(Vec<Release>, Option<String>), anyhow::Error> {
-    let release_url = format!("https://api.github.com/repos/{}/releases", repo);
+    let release_url = format!("https://api.github.com/repos/{}/releases", repo_slug);
     let client = reqwest::Client::new();
     let mut request = client.get(&release_url).header("User-Agent", "suiup");
 
@@ -28,19 +27,26 @@ pub async fn release_list(
     }
 
     // Add ETag for caching
-    if let Ok(etag) = read_etag_file(repo) {
+    if let Ok(etag) = read_etag_file(repo_slug) {
         request = request.header(IF_NONE_MATCH, etag);
     }
 
-    let response = request
-        .send()
-        .await
-        .with_context(|| format!("Failed to send request to {release_url}"))?;
+    let response = match request.send().await {
+        Ok(response) => response,
+        Err(err) => {
+            if let Some((releases, etag)) = load_cached_release_list(repo_slug)
+                .map_err(|e| anyhow!("Cannot load release list from cache: {e}"))?
+            {
+                return Ok((releases, Some(etag)));
+            }
+            return Err(err).with_context(|| format!("Failed to send request to {release_url}"));
+        }
+    };
 
     // note this only works with authenticated requests. Should add support for that later.
     if response.status() == reqwest::StatusCode::NOT_MODIFIED {
         // If nothing has changed, return an empty list and the existing ETag
-        if let Some((releases, etag)) = load_cached_release_list(repo)
+        if let Some((releases, etag)) = load_cached_release_list(repo_slug)
             .map_err(|e| anyhow!("Cannot load release list from cache: {e}"))?
         {
             return Ok((releases, Some(etag)));
@@ -55,6 +61,11 @@ pub async fn release_list(
 
     let status = response.status();
     if !status.is_success() {
+        if let Some((releases, etag)) = load_cached_release_list(repo_slug)
+            .map_err(|e| anyhow!("Cannot load release list from cache: {e}"))?
+        {
+            return Ok((releases, Some(etag)));
+        }
         let body = response
             .text()
             .await
@@ -64,14 +75,13 @@ pub async fn release_list(
 
     let releases: Vec<Release> =
         parse_json_response(response, &release_url, "GitHub releases list").await?;
-    save_release_list(repo, &releases, etag.clone())?;
+    save_release_list(repo_slug, &releases, etag.clone())?;
 
     Ok((releases, etag))
 }
 
-fn read_etag_file(repo: &Repo) -> Result<String, anyhow::Error> {
-    let repo_name = repo.to_string();
-    let repo_name = repo_name.replace("/", "_");
+fn read_etag_file(repo_slug: &str) -> Result<String, anyhow::Error> {
+    let repo_name = repo_slug.replace("/", "_");
     let filename = format!("etag_{}.txt", repo_name);
     let etag_file = get_suiup_cache_dir().join(filename);
     if etag_file.exists() {
@@ -93,13 +103,12 @@ pub async fn find_last_release_by_network(
 }
 
 fn save_release_list(
-    repo: &Repo,
+    repo_slug: &str,
     releases: &[Release],
     etag: Option<String>,
 ) -> Result<(), anyhow::Error> {
     println!("Saving releases list to cache");
-    let repo_name = repo.to_string();
-    let repo_name = repo_name.replace("/", "_");
+    let repo_name = repo_slug.replace("/", "_");
     let etag_filename = format!("etag_{}.txt", repo_name);
     let releases_filename = format!("releases_{}.txt", repo_name);
     let cache_dir = get_suiup_cache_dir();
@@ -125,9 +134,10 @@ fn save_release_list(
     Ok(())
 }
 
-fn load_cached_release_list(repo: &Repo) -> Result<Option<(Vec<Release>, String)>, anyhow::Error> {
-    let repo_name = repo.to_string();
-    let repo_name = repo_name.replace("/", "_");
+fn load_cached_release_list(
+    repo_slug: &str,
+) -> Result<Option<(Vec<Release>, String)>, anyhow::Error> {
+    let repo_name = repo_slug.replace("/", "_");
     let etag_filename = format!("etag_{}.txt", repo_name);
     let releases_filename = format!("releases_{}.txt", repo_name);
     let cache_file = get_suiup_cache_dir().join(releases_filename);

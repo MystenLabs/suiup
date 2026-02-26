@@ -1,0 +1,12 @@
+name = "move-analyzer"
+description = "Move Analyzer"
+repository = "MystenLabs/sui"
+main_branch = "main"
+installation_type = "archive"
+network_based = true
+supported_networks = ["testnet", "devnet", "mainnet"]
+default_network = "testnet"
+supports_debug = false
+cargo_package = ""
+nightly_toolchain = ""
+shared_repo_binary = true

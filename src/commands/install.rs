@@ -32,15 +32,15 @@ pub struct Command {
 }
 
 impl Command {
-    pub async fn exec(&self, github_token: &Option<String>) -> Result<()> {
+    pub async fn exec(&self, github_token: Option<&str>) -> Result<()> {
         handle_cmd(
             ComponentCommands::Add {
-                component: self.component.to_owned(),
-                nightly: self.nightly.to_owned(),
-                debug: self.debug.to_owned(),
-                yes: self.yes.to_owned(),
+                component: self.component.clone(),
+                nightly: self.nightly.clone(),
+                debug: self.debug,
+                yes: self.yes,
             },
-            github_token.to_owned(),
+            github_token,
         )
         .await
     }

@@ -7,8 +7,8 @@ use crate::commands::ComponentCommands;
 use crate::component::ComponentManager;
 
 /// Handle component commands by delegating to the ComponentManager
-pub async fn handle_cmd(cmd: ComponentCommands, github_token: Option<String>) -> Result<(), Error> {
-    let manager = ComponentManager::new(github_token);
+pub async fn handle_cmd(cmd: ComponentCommands, github_token: Option<&str>) -> Result<(), Error> {
+    let manager = ComponentManager::new(github_token.map(str::to_owned));
     manager.handle_command(cmd).await
 }
 

@@ -1,36 +1,36 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
-use lazy_static::lazy_static;
-use std::path::PathBuf;
-use std::{env, sync::Mutex};
+use anyhow::{Result, anyhow};
+use std::env;
+use std::path::{Path, PathBuf};
+use std::sync::{LazyLock, Mutex, MutexGuard};
 use suiup::paths::{
     get_cache_home, get_config_home, get_data_home, get_default_bin_dir, initialize,
 };
-use suiup::set_env_var;
+use suiup::{remove_env_var, set_env_var};
 use tempfile::TempDir;
 
-#[derive(Debug)]
 pub struct TestEnv {
     pub temp_dir: TempDir,
     pub data_dir: PathBuf,
     pub config_dir: PathBuf,
     pub cache_dir: PathBuf,
     pub bin_dir: PathBuf,
-    original_env: Vec<(String, String)>,
+    original_env: Vec<(String, Option<String>)>,
+    _env_guard: MutexGuard<'static, ()>,
 }
 
-lazy_static! {
-    static ref ZIP_FILES_MUTEX: Mutex<()> = Mutex::new(());
-}
+static ENV_VARS_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+static ZIP_FILES_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 impl TestEnv {
     pub fn new() -> Result<Self> {
+        let env_guard = ENV_VARS_MUTEX.lock().expect("failed to lock env mutex");
         let temp_dir = TempDir::new()?;
         let base = temp_dir.path();
 
-        let home_dir = dirs::home_dir().unwrap();
+        let home_dir = dirs::home_dir().ok_or_else(|| anyhow!("HOME directory is not set"))?;
 
         let data_home = get_data_home();
         let config_home = get_config_home();
@@ -73,7 +73,7 @@ impl TestEnv {
         assert!(bin_dir.exists());
 
         // Store original env vars
-        let vars_to_capture = vec![
+        let vars_to_capture = [
             "LOCALAPPDATA",
             "HOME",
             "XDG_DATA_HOME",
@@ -84,7 +84,7 @@ impl TestEnv {
 
         let original_env = vars_to_capture
             .into_iter()
-            .filter_map(|var| env::var(var).ok().map(|val| (var.to_string(), val)))
+            .map(|var| (var.to_string(), env::var(var).ok()))
             .collect();
 
         // Set test env vars
@@ -112,57 +112,39 @@ impl TestEnv {
             cache_dir,
             bin_dir,
             original_env,
+            _env_guard: env_guard,
         })
     }
 
     pub fn initialize_paths(&self) -> Result<(), anyhow::Error> {
-        initialize()
+        initialize()?;
+        Ok(())
     }
 
     pub fn copy_testnet_releases_to_cache(&self) -> Result<()> {
-        let _guard = ZIP_FILES_MUTEX.lock().unwrap();
+        let _guard = ZIP_FILES_MUTEX
+            .lock()
+            .expect("failed to lock zip-files mutex");
         // Create cache directory if it doesn't exist
         std::fs::create_dir_all(&self.cache_dir)?;
 
-        let testnet_v1_39_3 = "sui-testnet-v1.39.3-macos-arm64.tgz";
-        let testnet_v1_40_1 = "sui-testnet-v1.40.1-macos-arm64.tgz";
+        let (os, arch) = detect_os_arch_for_tests();
+        let testnet_v1_39_3 = format!("sui-testnet-v1.39.3-{os}-{arch}.tgz");
+        let testnet_v1_40_1 = format!("sui-testnet-v1.40.1-{os}-{arch}.tgz");
+        let walrus_v1_18_2 = format!("walrus-testnet-v1.18.2-{os}-{arch}.tgz");
 
         let data_path = PathBuf::new().join("tests").join("data");
-
-        let testnet_v1_39_3_path = data_path.join(testnet_v1_39_3);
-        let testnet_v1_40_1_path = data_path.join(testnet_v1_40_1);
-
-        // On CI / first run we do not have these files, so we skip copying them
-        if !testnet_v1_39_3_path.exists() || !testnet_v1_40_1_path.exists() {
-            return Ok(());
-        }
-
-        assert!(
-            testnet_v1_39_3_path.exists(),
-            "Something went wrong, release archives for test data are missing"
-        );
-        assert!(
-            testnet_v1_40_1_path.exists(),
-            "Something went wrong, release archives for test data are missing"
-        );
 
         let releases_dir = self.cache_dir.join("suiup").join("releases");
         std::fs::create_dir_all(&releases_dir)?;
 
-        std::fs::copy(
-            testnet_v1_39_3_path,
-            self.cache_dir
-                .join("suiup")
-                .join("releases")
-                .join(testnet_v1_39_3),
-        )?;
-        std::fs::copy(
-            testnet_v1_40_1_path,
-            self.cache_dir
-                .join("suiup")
-                .join("releases")
-                .join(testnet_v1_40_1),
-        )?;
+        let sui_139_dst = releases_dir.join(&testnet_v1_39_3);
+        let sui_140_dst = releases_dir.join(&testnet_v1_40_1);
+        let walrus_dst = releases_dir.join(&walrus_v1_18_2);
+
+        copy_cached_archive(&data_path.join(&testnet_v1_39_3), &sui_139_dst)?;
+        copy_cached_archive(&data_path.join(&testnet_v1_40_1), &sui_140_dst)?;
+        copy_cached_archive(&data_path.join(&walrus_v1_18_2), &walrus_dst)?;
 
         Ok(())
     }
@@ -170,11 +152,48 @@ impl TestEnv {
 
 impl Drop for TestEnv {
     fn drop(&mut self) {
-        // Restore original env vars
-        for (var, val) in &self.original_env {
-            set_env_var!(var, val);
+        for (key, value) in &self.original_env {
+            if let Some(value) = value {
+                set_env_var!(key, value);
+            } else {
+                remove_env_var!(key);
+            }
         }
     }
+}
+
+fn detect_os_arch_for_tests() -> (&'static str, &'static str) {
+    let os = if cfg!(target_os = "macos") {
+        "macos"
+    } else if cfg!(target_os = "linux") {
+        "ubuntu"
+    } else if cfg!(target_os = "windows") {
+        "windows"
+    } else {
+        "macos"
+    };
+
+    let arch = if cfg!(target_arch = "x86_64") {
+        "x86_64"
+    } else if cfg!(target_arch = "aarch64") {
+        if os == "macos" { "arm64" } else { "aarch64" }
+    } else {
+        "x86_64"
+    };
+
+    (os, arch)
+}
+
+fn copy_cached_archive(src: &Path, dst: &Path) -> Result<()> {
+    if dst.exists() {
+        return Ok(());
+    }
+
+    if src.exists() {
+        std::fs::copy(src, dst)?;
+    }
+
+    Ok(())
 }
 
 // Mock HTTP client for testing

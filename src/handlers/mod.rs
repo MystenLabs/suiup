@@ -9,7 +9,6 @@ use anyhow::anyhow;
 use flate2::read::GzDecoder;
 use std::env;
 use std::io::Write;
-use std::path::PathBuf;
 use std::{fs::File, io::BufReader};
 
 use crate::types::{BinaryVersion, InstalledBinaries};
@@ -33,17 +32,8 @@ pub mod which;
 
 pub const RELEASES_ARCHIVES_FOLDER: &str = "releases";
 
-pub fn available_components() -> &'static [&'static str] {
-    &[
-        "sui",
-        "mvr",
-        "walrus",
-        "site-builder",
-        "move-analyzer",
-        "signers",
-        "ledger-signer",
-        "yubikey-signer",
-    ]
+pub fn available_components() -> Vec<&'static str> {
+    crate::registry::BinaryRegistry::global().all_names()
 }
 
 // Main component handling function
@@ -259,10 +249,7 @@ fn check_path_and_warn() -> Result<(), Error> {
         #[cfg(not(windows))]
         let path_separator = ':';
 
-        if !path
-            .split(path_separator)
-            .any(|p| PathBuf::from(p) == local_bin)
-        {
+        if !path.split(path_separator).any(|p| *p == *local_bin) {
             println!("\nWARNING: {} is not in your PATH", local_bin.display());
 
             #[cfg(windows)]
