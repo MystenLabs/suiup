@@ -560,6 +560,25 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_no_command_shows_help() -> Result<()> {
+        let test_env = TestEnv::new()?;
+        test_env.initialize_paths()?;
+
+        let mut cmd = suiup_command(vec![], &test_env);
+        let usage = if cfg!(windows) {
+            "Usage: suiup.exe"
+        } else {
+            "Usage: suiup"
+        };
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains(usage));
+
+        Ok(())
+    }
+
     #[tokio::test]
     async fn test_cleanup_dry_run_workflow() -> Result<()> {
         let test_env = TestEnv::new()?;
