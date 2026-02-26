@@ -9,7 +9,6 @@ use anyhow::anyhow;
 use flate2::read::GzDecoder;
 use std::env;
 use std::io::Write;
-use std::path::PathBuf;
 use std::{fs::File, io::BufReader};
 
 use crate::types::{BinaryVersion, InstalledBinaries};
@@ -259,10 +258,7 @@ fn check_path_and_warn() -> Result<(), Error> {
         #[cfg(not(windows))]
         let path_separator = ':';
 
-        if !path
-            .split(path_separator)
-            .any(|p| PathBuf::from(p) == local_bin)
-        {
+        if !path.split(path_separator).any(|p| *p == *local_bin) {
             println!("\nWARNING: {} is not in your PATH", local_bin.display());
 
             #[cfg(windows)]
