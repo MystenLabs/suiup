@@ -22,14 +22,14 @@ pub struct Command {
 }
 
 impl Command {
-    pub async fn exec(&self, github_token: &Option<String>) -> Result<()> {
+    pub async fn exec(&self, github_token: Option<&str>) -> Result<()> {
         handle_cmd(
             ComponentCommands::Cleanup {
                 all: self.all,
                 days: self.days,
                 dry_run: self.dry_run,
             },
-            github_token.to_owned(),
+            github_token,
         )
         .await
     }

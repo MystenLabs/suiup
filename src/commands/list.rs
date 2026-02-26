@@ -13,7 +13,7 @@ use super::ComponentCommands;
 pub struct Command;
 
 impl Command {
-    pub async fn exec(&self, github_token: &Option<String>) -> Result<()> {
-        handle_cmd(ComponentCommands::List, github_token.to_owned()).await
+    pub async fn exec(&self, github_token: Option<&str>) -> Result<()> {
+        handle_cmd(ComponentCommands::List, github_token).await
     }
 }

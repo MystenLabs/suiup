@@ -21,8 +21,12 @@ pub mod types;
 #[macro_export]
 macro_rules! set_env_var {
     ($key:expr, $value:expr) => {
-        unsafe {
-            std::env::set_var($key, $value);
+        {
+            let key = $key;
+            let value = $value;
+            unsafe {
+                std::env::set_var(key, value);
+            }
         }
     };
 }
@@ -37,8 +41,11 @@ macro_rules! set_env_var {
 #[macro_export]
 macro_rules! remove_env_var {
     ($key:expr) => {
-        unsafe {
-            std::env::remove_var($key);
+        {
+            let key = $key;
+            unsafe {
+                std::env::remove_var(key);
+            }
         }
     };
 }

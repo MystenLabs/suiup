@@ -15,12 +15,12 @@ pub struct Command {
 }
 
 impl Command {
-    pub async fn exec(&self, github_token: &Option<String>) -> Result<()> {
+    pub async fn exec(&self, github_token: Option<&str>) -> Result<()> {
         handle_cmd(
             ComponentCommands::Remove {
-                binary: self.binary.to_owned(),
+                binary: self.binary.clone(),
             },
-            github_token.to_owned(),
+            github_token,
         )
         .await
     }

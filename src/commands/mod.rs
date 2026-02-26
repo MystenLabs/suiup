@@ -70,19 +70,20 @@ impl Command {
         }
 
         let github_token = self.normalized_github_token();
+        let github_token_ref = github_token.as_deref();
 
         match &self.command {
             Commands::Default(cmd) => cmd.exec(),
-            Commands::Doctor(cmd) => cmd.exec(&github_token).await,
-            Commands::Install(cmd) => cmd.exec(&github_token).await,
-            Commands::Remove(cmd) => cmd.exec(&github_token).await,
-            Commands::List(cmd) => cmd.exec(&github_token).await,
+            Commands::Doctor(cmd) => cmd.exec(github_token_ref).await,
+            Commands::Install(cmd) => cmd.exec(github_token_ref).await,
+            Commands::Remove(cmd) => cmd.exec(github_token_ref).await,
+            Commands::List(cmd) => cmd.exec(github_token_ref).await,
             Commands::Self_(cmd) => cmd.exec().await,
             Commands::Show(cmd) => cmd.exec(),
             Commands::Switch(cmd) => cmd.exec(),
-            Commands::Update(cmd) => cmd.exec(&github_token).await,
+            Commands::Update(cmd) => cmd.exec(github_token_ref).await,
             Commands::Which(cmd) => cmd.exec(),
-            Commands::Cleanup(cmd) => cmd.exec(&github_token).await,
+            Commands::Cleanup(cmd) => cmd.exec(github_token_ref).await,
         }
     }
 }
