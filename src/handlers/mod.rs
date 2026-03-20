@@ -264,7 +264,7 @@ fn check_path_and_warn() -> Result<(), Error> {
                 println!("5. Click 'Edit'");
                 println!("6. Click 'New'");
                 println!("7. Add the following path:");
-                println!("    %USERPROFILE%\\Local\\bin");
+                println!("    %USERPROFILE%\\AppData\\Local\\bin");
                 println!("8. Click 'OK' on all windows");
                 println!("9. Restart your terminal\n");
             }
