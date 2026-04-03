@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    handlers::download::{detect_os_arch, download_file},
+    handlers::{
+        download::{detect_os_arch, download_file},
+        release::ensure_version_prefix,
+    },
     paths::{binaries_dir, get_suiup_cache_dir},
 };
 use anyhow::{Context, Error, anyhow};
@@ -97,18 +100,18 @@ impl StandaloneInstaller {
     pub async fn download_version(
         &mut self,
         version: Option<String>,
-        binary_name_str: &String,
+        binary_name_str: &str,
     ) -> Result<String, Error> {
-        let version = if let Some(v) = version {
-            // Ensure version has 'v' prefix for GitHub release tags
-            crate::handlers::release::ensure_version_prefix(&v)
+        let explicit_version = version.as_deref().map(normalize_standalone_version);
+        let version = if let Some(version) = explicit_version.clone() {
+            version
         } else {
             if self.releases.is_empty() {
                 self.get_releases().await?;
             }
             let latest_release = self.get_latest_release()?.tag_name.clone();
             println!("No version specified. Downloading latest release: {latest_release}");
-            latest_release
+            standalone_tag_version(&latest_release).unwrap_or(latest_release)
         };
 
         let cache_folder = binaries_dir().join("standalone");
@@ -138,19 +141,22 @@ impl StandaloneInstaller {
         let release = self
             .releases
             .iter()
-            .find(|r| r.tag_name == version)
+            .find(|release| match explicit_version.as_deref() {
+                Some(version) => standalone_tag_matches_version(&release.tag_name, version),
+                None => true,
+            })
             .ok_or_else(|| anyhow!("Version {} not found", version))?;
 
         let (os, arch) = detect_os_arch()?;
-        let asset_name = format!("{}-{}-{}", binary_name_str, os, arch);
-
-        #[cfg(target_os = "windows")]
-        let asset_name = format!("{}.exe", asset_name);
-
-        let asset = release
-            .assets
+        let asset_names = standalone_asset_name_candidates(binary_name_str, &os, &arch);
+        let asset = asset_names
             .iter()
-            .find(|a| a.name.starts_with(&asset_name))
+            .find_map(|asset_name| {
+                release
+                    .assets
+                    .iter()
+                    .find(|asset| standalone_asset_name_matches(&asset.name, asset_name))
+            })
             .ok_or_else(|| {
                 anyhow!(
                     "No compatible binary found for your system: {}-{}",
@@ -189,6 +195,64 @@ impl StandaloneInstaller {
 
         Ok(version)
     }
+}
+
+fn normalize_standalone_version(version: &str) -> String {
+    ensure_version_prefix(version)
+}
+
+fn standalone_tag_version(tag: &str) -> Option<String> {
+    if tag.starts_with('v') || tag.chars().next().is_some_and(|c| c.is_ascii_digit()) {
+        return Some(ensure_version_prefix(tag));
+    }
+
+    tag.rsplit_once("-v")
+        .map(|(_, version)| format!("v{version}"))
+}
+
+fn standalone_tag_matches_version(tag: &str, version: &str) -> bool {
+    standalone_tag_version(tag)
+        .as_deref()
+        .is_some_and(|tag_version| tag_version == version)
+}
+
+fn standalone_os_candidates(os: &str) -> Vec<&str> {
+    match os {
+        "ubuntu" => vec!["ubuntu", "linux"],
+        "macos" => vec!["macos"],
+        "windows" => vec!["windows"],
+        _ => vec![os],
+    }
+}
+
+fn standalone_arch_candidates(arch: &str) -> Vec<&str> {
+    match arch {
+        "arm64" => vec!["arm64", "aarch64"],
+        "aarch64" => vec!["aarch64", "arm64"],
+        "x86_64" => vec!["x86_64"],
+        _ => vec![arch],
+    }
+}
+
+fn standalone_asset_name_candidates(binary_name: &str, os: &str, arch: &str) -> Vec<String> {
+    let os_candidates = standalone_os_candidates(os);
+    let arch_candidates = standalone_arch_candidates(arch);
+    let mut candidates = Vec::with_capacity(os_candidates.len() * arch_candidates.len());
+
+    for os_candidate in os_candidates {
+        for arch_candidate in &arch_candidates {
+            let candidate = format!("{binary_name}-{os_candidate}-{arch_candidate}");
+            if !candidates.contains(&candidate) {
+                candidates.push(candidate);
+            }
+        }
+    }
+
+    candidates
+}
+
+fn standalone_asset_name_matches(asset_name: &str, candidate: &str) -> bool {
+    asset_name.starts_with(candidate)
 }
 
 fn standalone_releases_cache_file(repo_slug: &str) -> std::path::PathBuf {
@@ -262,11 +326,87 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::StandaloneInstaller;
+    use super::*;
 
     #[test]
     fn standalone_installer_stores_github_token() {
         let installer = StandaloneInstaller::new("MystenLabs/mvr", Some("token123".to_string()));
         assert_eq!(installer.github_token.as_deref(), Some("token123"));
+    }
+
+    #[test]
+    fn standalone_tag_version_normalizes_prefixed_tags() {
+        assert_eq!(standalone_tag_version("v0.6.4"), Some("v0.6.4".to_string()));
+        assert_eq!(standalone_tag_version("0.6.4"), Some("v0.6.4".to_string()));
+        assert_eq!(
+            standalone_tag_version("seal-v0.6.4"),
+            Some("v0.6.4".to_string())
+        );
+    }
+
+    #[test]
+    fn standalone_tag_matches_requested_version() {
+        let version = normalize_standalone_version("0.6.4");
+
+        assert!(standalone_tag_matches_version("v0.6.4", &version));
+        assert!(standalone_tag_matches_version("seal-v0.6.4", &version));
+        assert!(!standalone_tag_matches_version("seal-v0.6.5", &version));
+    }
+
+    #[test]
+    fn standalone_asset_name_candidates_include_linux_aliases() {
+        assert_eq!(
+            standalone_asset_name_candidates("seal", "ubuntu", "x86_64"),
+            vec![
+                "seal-ubuntu-x86_64".to_string(),
+                "seal-linux-x86_64".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn standalone_asset_name_candidates_include_arm64_aliases() {
+        assert_eq!(
+            standalone_asset_name_candidates("seal", "macos", "arm64"),
+            vec![
+                "seal-macos-arm64".to_string(),
+                "seal-macos-aarch64".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn standalone_asset_name_matching_keeps_existing_behavior() {
+        let candidates = standalone_asset_name_candidates("mvr", "ubuntu", "x86_64");
+        assert!(
+            candidates
+                .iter()
+                .any(|candidate| standalone_asset_name_matches("mvr-ubuntu-x86_64", candidate))
+        );
+        assert!(
+            candidates
+                .iter()
+                .any(|candidate| standalone_asset_name_matches("mvr-linux-x86_64", candidate))
+        );
+
+        let candidates = standalone_asset_name_candidates("mvr", "macos", "arm64");
+        assert!(
+            candidates
+                .iter()
+                .any(|candidate| standalone_asset_name_matches("mvr-macos-arm64", candidate))
+        );
+        assert!(
+            candidates
+                .iter()
+                .any(|candidate| standalone_asset_name_matches("mvr-macos-aarch64", candidate))
+        );
+    }
+
+    #[test]
+    fn standalone_asset_name_matching_accepts_windows_extensions() {
+        let candidates = standalone_asset_name_candidates("seal", "windows", "x86_64");
+        assert!(candidates.iter().any(|candidate| {
+            standalone_asset_name_matches("seal-windows-x86_64.exe", candidate)
+        }));
     }
 }
