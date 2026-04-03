@@ -252,11 +252,18 @@ mod tests {
     use super::*;
     use crate::remove_env_var;
     use crate::set_env_var;
+    use lazy_static::lazy_static;
     use std::fs;
+    use std::sync::Mutex;
     use tempfile::TempDir;
+
+    lazy_static! {
+        static ref ENV_MUTEX: Mutex<()> = Mutex::new(());
+    }
 
     #[test]
     fn test_check_suiup_data_dir_exists() {
+        let _guard = ENV_MUTEX.lock().unwrap();
         let temp_dir = TempDir::new().unwrap();
         let data_dir = temp_dir.path();
         fs::create_dir_all(data_dir.join("suiup")).unwrap();
@@ -299,6 +306,7 @@ mod tests {
 
     #[test]
     fn test_check_suiup_data_dir_not_found() {
+        let _guard = ENV_MUTEX.lock().unwrap();
         let temp_dir = TempDir::new().unwrap();
         let data_dir = temp_dir.path();
 
