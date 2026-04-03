@@ -253,8 +253,8 @@ mod tests {
     use crate::remove_env_var;
     use crate::set_env_var;
     use lazy_static::lazy_static;
-    use std::sync::Mutex;
     use std::fs;
+    use std::sync::Mutex;
     use tempfile::TempDir;
 
     lazy_static! {
