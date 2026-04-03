@@ -1,3 +1,11 @@
+## 0.0.11 - 2026-04-02
+
+- Added support for installing the `seal` binary.
+- Improved standalone release matching for `linux`/`ubuntu`, `arm64`/`aarch64`, and tags like `seal-v0.6.4`.
+- Stabilized environment-dependent doctor tests when running in parallel.
+- Fixed dependency security advisories and CVEs.
+- Fixed Windows installation documentation.
+
 ## 0.0.10 - 2026-02-26
 
 - Added support for installing `sui-node` binary.
