@@ -287,6 +287,44 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(not(windows))]
+    #[tokio::test]
+    async fn test_complete_update_command_replaces_executable() -> Result<()> {
+        use std::os::unix::fs::PermissionsExt;
+
+        let test_env = TestEnv::new()?;
+        test_env.initialize_paths()?;
+
+        let target = test_env.temp_dir.path().join("suiup-target");
+        let source = test_env.temp_dir.path().join("suiup-source");
+
+        fs::write(&target, "#!/bin/sh\necho old\n")?;
+        fs::write(&source, "#!/bin/sh\necho new\n")?;
+        fs::set_permissions(&target, fs::Permissions::from_mode(0o755))?;
+        fs::set_permissions(&source, fs::Permissions::from_mode(0o755))?;
+
+        let mut cmd = suiup_command(
+            vec![
+                "self",
+                "complete-update",
+                "--target",
+                target.to_str().unwrap(),
+                "--source",
+                source.to_str().unwrap(),
+            ],
+            &test_env,
+        );
+        cmd.assert().success();
+
+        let mut replaced = Command::new(&target);
+        replaced
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("new"));
+
+        Ok(())
+    }
+
     #[tokio::test]
     async fn test_default_workflow() -> Result<(), anyhow::Error> {
         let test_env = TestEnv::new()?;
