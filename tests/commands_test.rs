@@ -47,6 +47,14 @@ mod tests {
         };
         assert_eq!(expected, result);
 
+        let result = parse_component_with_version("seal")?;
+        let expected = CommandMetadata {
+            name: BinaryName::new("seal").unwrap(),
+            network: "testnet".to_string(),
+            version: None,
+        };
+        assert_eq!(expected, result);
+
         let result = parse_component_with_version("random");
         assert!(
             result
@@ -62,6 +70,7 @@ mod tests {
     fn test_sui_component_display() {
         assert_eq!(BinaryName::new("sui").unwrap().to_string(), "sui");
         assert_eq!(BinaryName::new("mvr").unwrap().to_string(), "mvr");
+        assert_eq!(BinaryName::new("seal").unwrap().to_string(), "seal");
         assert_eq!(BinaryName::new("walrus").unwrap().to_string(), "walrus");
     }
 

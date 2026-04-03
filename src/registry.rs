@@ -183,6 +183,7 @@ mod tests {
             "sui",
             "sui-node",
             "mvr",
+            "seal",
             "walrus",
             "site-builder",
             "move-analyzer",
@@ -216,6 +217,15 @@ mod tests {
         assert_eq!(config.repository, "MystenLabs/mvr");
         assert_eq!(config.installation_type, InstallationType::Standalone);
         assert!(!config.network_based);
+    }
+
+    #[test]
+    fn seal_config_values() {
+        let config = BinaryRegistry::global().get("seal").unwrap();
+        assert_eq!(config.repository, "MystenLabs/seal");
+        assert_eq!(config.installation_type, InstallationType::Standalone);
+        assert!(!config.network_based);
+        assert_eq!(config.cargo_package.as_deref(), Some("seal-cli"));
     }
 
     #[test]
