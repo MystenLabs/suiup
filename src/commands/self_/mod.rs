@@ -1,6 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+mod complete_update;
 mod uninstall;
 mod update;
 
@@ -18,6 +19,8 @@ pub struct Command {
 enum Commands {
     Update(update::Command),
     Uninstall(uninstall::Command),
+    #[command(name = "complete-update", hide = true)]
+    CompleteUpdate(complete_update::Command),
 }
 
 impl Command {
@@ -26,6 +29,7 @@ impl Command {
         match &self.command {
             Commands::Update(cmd) => cmd.exec().await,
             Commands::Uninstall(cmd) => cmd.exec(),
+            Commands::CompleteUpdate(cmd) => cmd.exec(),
         }
     }
 }

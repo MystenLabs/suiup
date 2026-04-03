@@ -5,7 +5,9 @@ use super::download::detect_os_arch;
 
 use crate::handlers::download::download_file;
 use anyhow::{Context, Result, anyhow};
-use std::{fmt::Display, process::Command};
+use std::{fmt::Display, path::Path, process::Command};
+#[cfg(windows)]
+use std::{path::PathBuf, time::Duration};
 use tokio::task;
 
 use flate2::read::GzDecoder;
@@ -202,19 +204,24 @@ pub async fn handle_update() -> Result<()> {
     #[cfg(windows)]
     let binary = "suiup.exe";
 
-    // replace the current binary with the new one
     let binary_path = temp_dir.path().join(binary);
-    std::fs::copy(&binary_path, &current_exe).with_context(|| {
-        format!(
-            "Cannot replace current executable {} with {}",
-            current_exe.display(),
-            binary_path.display()
-        )
-    })?;
+    #[cfg(not(windows))]
+    {
+        replace_current_executable(&binary_path, &current_exe)?;
+        println!("suiup updated to version {}", latest_version);
+        temp_dir.close()?;
+    }
 
-    println!("suiup updated to version {}", latest_version);
-    // cleanup
-    temp_dir.close()?;
+    #[cfg(windows)]
+    {
+        let staged_update = stage_windows_update(&binary_path, &current_exe)?;
+        spawn_windows_update_helper(&current_exe, &staged_update)?;
+        println!(
+            "suiup update to version {} is staged and will finalize after this process exits",
+            latest_version
+        );
+    }
+
     Ok(())
 }
 
@@ -254,6 +261,337 @@ where
     })
 }
 
+pub fn handle_complete_update(
+    target: &Path,
+    source: &Path,
+    parent_pid: Option<u32>,
+    helper_path: Option<&Path>,
+) -> Result<()> {
+    #[cfg(windows)]
+    {
+        complete_windows_update(target, source, parent_pid, helper_path)?;
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = parent_pid;
+        let _ = helper_path;
+        replace_current_executable(source, target)?;
+    }
+
+    Ok(())
+}
+
+fn replace_current_executable(source: &Path, target: &Path) -> Result<()> {
+    let target_dir = target.parent().ok_or_else(|| {
+        anyhow!(
+            "Cannot replace current executable {} because it has no parent directory",
+            target.display()
+        )
+    })?;
+
+    let staged_path = tempfile::Builder::new()
+        .prefix(".suiup-update-")
+        .tempfile_in(target_dir)
+        .with_context(|| {
+            format!(
+                "Cannot create staged executable in {}",
+                target_dir.display()
+            )
+        })?
+        .into_temp_path();
+
+    std::fs::copy(source, &staged_path).with_context(|| {
+        format!(
+            "Cannot stage executable update from {} to {}",
+            source.display(),
+            staged_path.display()
+        )
+    })?;
+
+    let permissions = std::fs::metadata(source)
+        .with_context(|| format!("Cannot read metadata for {}", source.display()))?
+        .permissions();
+    std::fs::set_permissions(&staged_path, permissions).with_context(|| {
+        format!(
+            "Cannot set executable permissions on staged binary {}",
+            staged_path.display()
+        )
+    })?;
+
+    std::fs::rename(&staged_path, target).with_context(|| {
+        format!(
+            "Cannot replace current executable {} with staged file {}",
+            target.display(),
+            staged_path.display()
+        )
+    })?;
+
+    Ok(())
+}
+
+#[cfg(windows)]
+struct StagedWindowsUpdate {
+    helper_path: PathBuf,
+    staged_path: PathBuf,
+}
+
+#[cfg(windows)]
+fn stage_windows_update(source: &Path, target: &Path) -> Result<StagedWindowsUpdate> {
+    let staged_path = windows_staged_update_path(target);
+    let helper_path = windows_helper_update_path(target);
+
+    if staged_path.exists() {
+        std::fs::remove_file(&staged_path).with_context(|| {
+            format!(
+                "Cannot remove previous staged update {}",
+                staged_path.display()
+            )
+        })?;
+    }
+
+    if helper_path.exists() {
+        std::fs::remove_file(&helper_path).with_context(|| {
+            format!(
+                "Cannot remove previous self-update helper {}",
+                helper_path.display()
+            )
+        })?;
+    }
+
+    std::fs::copy(source, &staged_path).with_context(|| {
+        format!(
+            "Cannot stage current executable replacement from {} to {}",
+            source.display(),
+            staged_path.display()
+        )
+    })?;
+    std::fs::copy(source, &helper_path).with_context(|| {
+        format!(
+            "Cannot stage self-update helper from {} to {}",
+            source.display(),
+            helper_path.display()
+        )
+    })?;
+
+    let permissions = std::fs::metadata(source)
+        .with_context(|| format!("Cannot read metadata for {}", source.display()))?
+        .permissions();
+    std::fs::set_permissions(&staged_path, permissions).with_context(|| {
+        format!(
+            "Cannot set permissions on staged update {}",
+            staged_path.display()
+        )
+    })?;
+    let helper_permissions = std::fs::metadata(source)
+        .with_context(|| format!("Cannot read metadata for {}", source.display()))?
+        .permissions();
+    std::fs::set_permissions(&helper_path, helper_permissions).with_context(|| {
+        format!(
+            "Cannot set permissions on staged helper {}",
+            helper_path.display()
+        )
+    })?;
+
+    Ok(StagedWindowsUpdate {
+        helper_path,
+        staged_path,
+    })
+}
+
+#[cfg(windows)]
+fn windows_staged_update_path(target: &Path) -> PathBuf {
+    PathBuf::from(format!("{}.new", target.display()))
+}
+
+#[cfg(windows)]
+fn windows_helper_update_path(target: &Path) -> PathBuf {
+    PathBuf::from(format!("{}.helper", target.display()))
+}
+
+#[cfg(windows)]
+fn spawn_windows_update_helper(
+    current_exe: &Path,
+    staged_update: &StagedWindowsUpdate,
+) -> Result<()> {
+    let mut cmd = Command::new(&staged_update.helper_path);
+    cmd.arg("self")
+        .arg("complete-update")
+        .arg("--target")
+        .arg(current_exe)
+        .arg("--source")
+        .arg(&staged_update.staged_path)
+        .arg("--helper-path")
+        .arg(&staged_update.helper_path)
+        .arg("--parent-pid")
+        .arg(std::process::id().to_string())
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    cmd.spawn().with_context(|| {
+        format!(
+            "Cannot launch self-update helper {} for staged binary {}",
+            staged_update.helper_path.display(),
+            staged_update.staged_path.display()
+        )
+    })?;
+
+    Ok(())
+}
+
+#[cfg(windows)]
+fn complete_windows_update(
+    target: &Path,
+    source: &Path,
+    parent_pid: Option<u32>,
+    helper_path: Option<&Path>,
+) -> Result<()> {
+    if let Some(parent_pid) = parent_pid {
+        wait_for_parent_exit(parent_pid, Duration::from_secs(10))?;
+    }
+
+    replace_windows_file_with_retries(target, source, 40, Duration::from_millis(250))?;
+
+    if source.exists() {
+        std::fs::remove_file(source)
+            .with_context(|| format!("Cannot remove staged update file {}", source.display()))?;
+    }
+
+    if let Some(helper_path) = helper_path {
+        cleanup_windows_helper(helper_path)?;
+    }
+
+    Ok(())
+}
+
+#[cfg(windows)]
+fn replace_windows_file_with_retries(
+    target: &Path,
+    source: &Path,
+    attempts: usize,
+    delay: Duration,
+) -> Result<()> {
+    let mut last_error = None;
+
+    for _ in 0..attempts {
+        if target.exists()
+            && let Err(err) = std::fs::remove_file(target)
+        {
+            last_error = Some(anyhow!(
+                "Cannot remove current executable {}: {err}",
+                target.display()
+            ));
+            std::thread::sleep(delay);
+            continue;
+        }
+
+        match std::fs::rename(source, target) {
+            Ok(()) => return Ok(()),
+            Err(err) => {
+                last_error = Some(anyhow!(
+                    "Cannot replace current executable {} with {}: {err}",
+                    target.display(),
+                    source.display()
+                ));
+                std::thread::sleep(delay);
+            }
+        }
+    }
+
+    Err(last_error.unwrap_or_else(|| {
+        anyhow!(
+            "Cannot replace current executable {} with {}",
+            target.display(),
+            source.display()
+        )
+    }))
+}
+
+#[cfg(windows)]
+fn wait_for_parent_exit(parent_pid: u32, timeout: Duration) -> Result<()> {
+    use std::ffi::c_void;
+
+    type Handle = *mut c_void;
+
+    const SYNCHRONIZE: u32 = 0x0010_0000;
+    const WAIT_OBJECT_0: u32 = 0x0000_0000;
+    const WAIT_TIMEOUT: u32 = 0x0000_0102;
+    const WAIT_FAILED: u32 = 0xFFFF_FFFF;
+
+    unsafe extern "system" {
+        fn CloseHandle(h_object: Handle) -> i32;
+        fn OpenProcess(desired_access: u32, inherit_handle: i32, process_id: u32) -> Handle;
+        fn WaitForSingleObject(handle: Handle, milliseconds: u32) -> u32;
+    }
+
+    struct HandleGuard(Handle);
+
+    impl Drop for HandleGuard {
+        fn drop(&mut self) {
+            if !self.0.is_null() {
+                unsafe {
+                    CloseHandle(self.0);
+                }
+            }
+        }
+    }
+
+    let handle = unsafe { OpenProcess(SYNCHRONIZE, 0, parent_pid) };
+    if handle.is_null() {
+        return Ok(());
+    }
+
+    let _guard = HandleGuard(handle);
+    let timeout_ms = timeout.as_millis().min(u32::MAX as u128) as u32;
+    let wait_status = unsafe { WaitForSingleObject(handle, timeout_ms) };
+
+    match wait_status {
+        WAIT_OBJECT_0 | WAIT_TIMEOUT => Ok(()),
+        WAIT_FAILED => Err(anyhow!(
+            "Cannot wait for parent process {} to exit",
+            parent_pid
+        )),
+        other => Err(anyhow!(
+            "Unexpected wait status {} while waiting for parent process {}",
+            other,
+            parent_pid
+        )),
+    }
+}
+
+#[cfg(windows)]
+fn cleanup_windows_helper(helper_path: &Path) -> Result<()> {
+    let cleanup_cmd = format!(
+        "ping 127.0.0.1 -n 2 > nul & del /f /q \"{}\"",
+        helper_path.display()
+    );
+
+    let mut cmd = Command::new("cmd");
+    cmd.arg("/C")
+        .arg(cleanup_cmd)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    cmd.spawn().with_context(|| {
+        format!(
+            "Cannot schedule cleanup for self-update helper {}",
+            helper_path.display()
+        )
+    })?;
+
+    Ok(())
+}
+
 fn find_archive_name() -> Result<String> {
     let (os, arch) = detect_os_arch()?;
 
@@ -282,6 +620,9 @@ fn find_archive_name() -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    #[cfg(not(windows))]
+    use std::os::unix::fs::PermissionsExt;
 
     #[test]
     fn test_ver_from_str_valid_versions() {
@@ -383,5 +724,61 @@ mod tests {
 
         let v3 = Ver::from_str("0.0.0").unwrap();
         assert_eq!(format!("{}", v3), "0.0.0");
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn test_replace_current_executable_stages_in_target_directory() {
+        let source_dir = tempfile::tempdir().unwrap();
+        let target_dir = tempfile::tempdir().unwrap();
+        let source = source_dir.path().join("suiup-new");
+        let target = target_dir.path().join("suiup");
+
+        fs::write(&source, b"new version").unwrap();
+        fs::write(&target, b"old version").unwrap();
+        fs::set_permissions(&source, fs::Permissions::from_mode(0o751)).unwrap();
+
+        replace_current_executable(&source, &target).unwrap();
+
+        assert_eq!(fs::read(&target).unwrap(), b"new version");
+        assert_eq!(fs::read(&source).unwrap(), b"new version");
+        let mode = fs::metadata(&target).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o751);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_staged_update_path_uses_new_suffix() {
+        let target = PathBuf::from(r"C:\Users\foo\.local\bin\suiup.exe");
+        assert_eq!(
+            windows_staged_update_path(&target),
+            PathBuf::from(r"C:\Users\foo\.local\bin\suiup.exe.new")
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_replace_windows_file_with_retries_replaces_target() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let source = temp_dir.path().join("suiup.exe.new");
+        let target = temp_dir.path().join("suiup.exe");
+
+        fs::write(&source, b"new version").unwrap();
+        fs::write(&target, b"old version").unwrap();
+
+        replace_windows_file_with_retries(&target, &source, 2, Duration::from_millis(1)).unwrap();
+
+        assert_eq!(fs::read(&target).unwrap(), b"new version");
+        assert!(!source.exists());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_helper_update_path_uses_helper_suffix() {
+        let target = PathBuf::from(r"C:\Users\foo\.local\bin\suiup.exe");
+        assert_eq!(
+            windows_helper_update_path(&target),
+            PathBuf::from(r"C:\Users\foo\.local\bin\suiup.exe.helper")
+        );
     }
 }
