@@ -332,8 +332,10 @@ fn print_release_entry(
             *update_count += 1;
             let latest = entry.latest_version.as_deref().unwrap_or("?");
             let update_cmd = match &entry.network {
-                Some(network) => format!("suiup update {}@{}", binary_name, network),
-                None => format!("suiup update {}", binary_name),
+                Some(network) => {
+                    format!("suiup install {}@{}-{}", binary_name, network, latest)
+                }
+                None => format!("suiup install {}@{}", binary_name, latest),
             };
             println!(
                 "  {}{:<width$} {} {}   {}",

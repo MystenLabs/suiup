@@ -7,6 +7,7 @@ use clap::Args;
 use crate::handlers::status::handle_status;
 
 /// Check for available updates for installed binaries.
+/// Use `suiup list` to see all available binaries to install.
 #[derive(Args, Debug)]
 pub struct Command;
 
