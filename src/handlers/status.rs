@@ -456,13 +456,13 @@ mod tests {
     #[test]
     fn find_max_version_in_network_uses_semver_not_lexicographic() {
         let binaries = vec![
-            make_binary("mvr", "standalone", "v0.0.5"),
-            make_binary("mvr", "standalone", "v0.0.13"),
-            make_binary("mvr", "standalone", "v0.0.14"),
+            make_binary("sui", "testnet", "v1.9.0"),
+            make_binary("sui", "testnet", "v1.10.1"),
+            make_binary("sui", "testnet", "v1.9.3"),
         ];
         assert_eq!(
-            find_max_version_in_network(&binaries, "mvr"),
-            Some("v0.0.14".to_string())
+            find_max_version_in_network(&binaries, "sui"),
+            Some("v1.10.1".to_string())
         );
     }
 
