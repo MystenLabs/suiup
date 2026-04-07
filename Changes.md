@@ -1,3 +1,8 @@
+## 0.0.12 - 2026-04-06
+
+- Added `suiup status` command to check for available updates across all installed binaries.
+- Fixed self-update on Linux when the OS throws an error due to in-place file copying.
+
 ## 0.0.11 - 2026-04-02
 
 - Added support for installing the `seal` binary.
