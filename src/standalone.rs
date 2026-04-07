@@ -96,6 +96,17 @@ impl StandaloneInstaller {
             .ok_or_else(|| anyhow!("No releases found for {}", self.repo_slug))
     }
 
+    /// Returns the latest version string (e.g. "v0.6.5") without printing or downloading.
+    /// Caller must call `get_releases()` first.
+    pub fn latest_version(&self) -> Result<String, Error> {
+        let release = self
+            .releases
+            .first()
+            .ok_or_else(|| anyhow!("No releases found for {}", self.repo_slug))?;
+        standalone_tag_version(&release.tag_name)
+            .ok_or_else(|| anyhow!("Cannot extract version from tag: {}", release.tag_name))
+    }
+
     /// Download the CLI binary, if it does not exist in the binary folder.
     pub async fn download_version(
         &mut self,
