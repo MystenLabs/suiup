@@ -107,7 +107,7 @@ fn save_release_list(
     releases: &[Release],
     etag: Option<String>,
 ) -> Result<(), anyhow::Error> {
-    println!("Saving releases list to cache");
+    tracing::debug!("Saving releases list to cache");
     let repo_name = repo_slug.replace("/", "_");
     let etag_filename = format!("etag_{}.txt", repo_name);
     let releases_filename = format!("releases_{}.txt", repo_name);
