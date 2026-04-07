@@ -756,6 +756,58 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_status_no_binaries_installed() -> Result<()> {
+        let test_env = TestEnv::new()?;
+        test_env.initialize_paths()?;
+
+        let mut cmd = suiup_command(vec!["status"], &test_env);
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains("No binaries installed"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_status_with_installed_binary() -> Result<()> {
+        if !github_is_reachable() {
+            return Ok(());
+        }
+
+        let test_env = TestEnv::new()?;
+        test_env.initialize_paths()?;
+        test_env.copy_testnet_releases_to_cache()?;
+
+        // Install sui from cached archive
+        let mut cmd = suiup_command(vec!["install", "sui@testnet-1.39.3", "-y"], &test_env);
+        cmd.assert().success();
+
+        // Run status
+        let mut cmd = suiup_command(vec!["status"], &test_env);
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains("Checking for updates"))
+            .stdout(predicate::str::contains("sui"))
+            .stdout(predicate::str::contains("MystenLabs/sui"))
+            .stdout(predicate::str::contains("testnet"))
+            .stdout(predicate::str::contains("v1.39.3"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_status_help_mentions_list() -> Result<()> {
+        let test_env = TestEnv::new()?;
+
+        let mut cmd = suiup_command(vec!["status", "--help"], &test_env);
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains("suiup list"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_cleanup_after_install_workflow() -> Result<()> {
         let test_env = TestEnv::new()?;
         test_env.initialize_paths()?;

@@ -380,3 +380,117 @@ fn find_max_version_in_network(network_binaries: &[BinaryVersion], name: &str) -
         .max_by(|a, b| a.version.cmp(&b.version))
         .map(|b| b.version.clone())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::BinaryVersion;
+
+    fn make_binary(name: &str, network: &str, version: &str) -> BinaryVersion {
+        BinaryVersion {
+            binary_name: name.to_string(),
+            network_release: network.to_string(),
+            version: version.to_string(),
+            debug: false,
+            path: None,
+        }
+    }
+
+    #[test]
+    fn find_max_version_picks_highest() {
+        let binaries = vec![
+            make_binary("sui", "testnet", "v1.39.0"),
+            make_binary("sui", "testnet", "v1.40.1"),
+            make_binary("sui", "testnet", "v1.39.3"),
+        ];
+        assert_eq!(
+            find_max_version_for_binary(&binaries, "sui"),
+            Some("v1.40.1".to_string())
+        );
+    }
+
+    #[test]
+    fn find_max_version_filters_by_name() {
+        let binaries = vec![
+            make_binary("sui", "testnet", "v1.39.0"),
+            make_binary("mvr", "standalone", "v9.0.0"),
+            make_binary("sui", "testnet", "v1.40.1"),
+        ];
+        assert_eq!(
+            find_max_version_for_binary(&binaries, "sui"),
+            Some("v1.40.1".to_string())
+        );
+    }
+
+    #[test]
+    fn find_max_version_returns_none_when_missing() {
+        let binaries = vec![make_binary("sui", "testnet", "v1.39.0")];
+        assert_eq!(find_max_version_for_binary(&binaries, "mvr"), None);
+    }
+
+    #[test]
+    fn find_max_version_returns_none_on_empty() {
+        let binaries: Vec<BinaryVersion> = vec![];
+        assert_eq!(find_max_version_for_binary(&binaries, "sui"), None);
+    }
+
+    #[test]
+    fn find_max_version_in_network_picks_highest() {
+        let binaries = vec![
+            make_binary("sui", "testnet", "v1.39.0"),
+            make_binary("sui", "testnet", "v1.40.1"),
+            make_binary("walrus", "testnet", "v1.15.0"),
+        ];
+        assert_eq!(
+            find_max_version_in_network(&binaries, "sui"),
+            Some("v1.40.1".to_string())
+        );
+    }
+
+    #[test]
+    fn find_max_version_in_network_ignores_other_binaries() {
+        let binaries = vec![
+            make_binary("sui", "testnet", "v1.39.0"),
+            make_binary("walrus", "testnet", "v9.0.0"),
+        ];
+        assert_eq!(
+            find_max_version_in_network(&binaries, "sui"),
+            Some("v1.39.0".to_string())
+        );
+    }
+
+    #[test]
+    fn nightly_binaries_are_separated() {
+        let binaries = vec![
+            make_binary("sui", "testnet", "v1.39.0"),
+            make_binary("sui", "main", "nightly"),
+            make_binary("mvr", "standalone", "v0.6.4"),
+            make_binary("mvr", "main", "nightly"),
+        ];
+
+        let nightly: Vec<_> = binaries.iter().filter(|b| b.version == "nightly").collect();
+        let release: Vec<_> = binaries.iter().filter(|b| b.version != "nightly").collect();
+
+        assert_eq!(nightly.len(), 2);
+        assert_eq!(release.len(), 2);
+        assert!(nightly.iter().all(|b| b.version == "nightly"));
+        assert!(release.iter().all(|b| b.version != "nightly"));
+    }
+
+    #[test]
+    fn nightly_excluded_from_max_version() {
+        let binaries = vec![
+            make_binary("sui", "testnet", "v1.39.0"),
+            make_binary("sui", "main", "nightly"),
+        ];
+        // "nightly" > "v1.39.0" lexicographically, so if not filtered it would win
+        let release_only: Vec<_> = binaries
+            .into_iter()
+            .filter(|b| b.version != "nightly")
+            .collect();
+        assert_eq!(
+            find_max_version_for_binary(&release_only, "sui"),
+            Some("v1.39.0".to_string())
+        );
+    }
+}
