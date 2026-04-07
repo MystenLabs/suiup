@@ -368,12 +368,25 @@ fn print_release_entry(
     }
 }
 
+/// Parse a version string (with optional leading 'v') into a semver::Version.
+fn parse_semver(v: &str) -> Option<semver::Version> {
+    semver::Version::parse(v.strip_prefix('v').unwrap_or(v)).ok()
+}
+
+/// Compare two version strings using semver, falling back to lexicographic comparison.
+fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
+    match (parse_semver(a), parse_semver(b)) {
+        (Some(va), Some(vb)) => va.cmp(&vb),
+        _ => a.cmp(b),
+    }
+}
+
 /// Find the max version of a binary across all networks/entries.
 fn find_max_version_for_binary(binaries: &[BinaryVersion], name: &str) -> Option<String> {
     binaries
         .iter()
         .filter(|b| b.binary_name == name)
-        .max_by(|a, b| a.version.cmp(&b.version))
+        .max_by(|a, b| compare_versions(&a.version, &b.version))
         .map(|b| b.version.clone())
 }
 
@@ -382,7 +395,7 @@ fn find_max_version_in_network(network_binaries: &[BinaryVersion], name: &str) -
     network_binaries
         .iter()
         .filter(|b| b.binary_name == name)
-        .max_by(|a, b| a.version.cmp(&b.version))
+        .max_by(|a, b| compare_versions(&a.version, &b.version))
         .map(|b| b.version.clone())
 }
 
@@ -424,6 +437,32 @@ mod tests {
         assert_eq!(
             find_max_version_for_binary(&binaries, "sui"),
             Some("v1.40.1".to_string())
+        );
+    }
+
+    #[test]
+    fn find_max_version_uses_semver_not_lexicographic() {
+        let binaries = vec![
+            make_binary("mvr", "standalone", "v0.0.5"),
+            make_binary("mvr", "standalone", "v0.0.13"),
+            make_binary("mvr", "standalone", "v0.0.14"),
+        ];
+        assert_eq!(
+            find_max_version_for_binary(&binaries, "mvr"),
+            Some("v0.0.14".to_string())
+        );
+    }
+
+    #[test]
+    fn find_max_version_in_network_uses_semver_not_lexicographic() {
+        let binaries = vec![
+            make_binary("sui", "testnet", "v1.9.0"),
+            make_binary("sui", "testnet", "v1.10.1"),
+            make_binary("sui", "testnet", "v1.9.3"),
+        ];
+        assert_eq!(
+            find_max_version_in_network(&binaries, "sui"),
+            Some("v1.10.1".to_string())
         );
     }
 
