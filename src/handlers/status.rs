@@ -40,10 +40,8 @@ pub async fn handle_status(github_token: Option<String>) -> Result<(), Error> {
 
     // Separate nightly binaries -- they are installed from branches and we don't
     // track commit SHAs, so we cannot check for updates.
-    let nightly_binaries: Vec<&BinaryVersion> = binaries
-        .iter()
-        .filter(|b| b.version == "nightly")
-        .collect();
+    let nightly_binaries: Vec<&BinaryVersion> =
+        binaries.iter().filter(|b| b.version == "nightly").collect();
     let release_binaries: Vec<BinaryVersion> = binaries
         .iter()
         .filter(|b| b.version != "nightly")
@@ -84,15 +82,13 @@ pub async fn handle_status(github_token: Option<String>) -> Result<(), Error> {
         let config = registry.get(first_name).unwrap();
 
         if config.installation_type == InstallationType::Standalone {
-            let mut installer =
-                StandaloneInstaller::new(repo_slug, github_token.clone());
+            let mut installer = StandaloneInstaller::new(repo_slug, github_token.clone());
             match installer.get_releases().await {
                 Ok(()) => {
                     standalone_installers.insert(repo_slug.to_string(), installer);
                 }
                 Err(e) => {
-                    network_releases
-                        .insert(repo_slug.to_string(), Err(e.to_string()));
+                    network_releases.insert(repo_slug.to_string(), Err(e.to_string()));
                 }
             }
         } else {
@@ -101,8 +97,7 @@ pub async fn handle_status(github_token: Option<String>) -> Result<(), Error> {
                     network_releases.insert(repo_slug.to_string(), Ok(releases));
                 }
                 Err(e) => {
-                    network_releases
-                        .insert(repo_slug.to_string(), Err(e.to_string()));
+                    network_releases.insert(repo_slug.to_string(), Err(e.to_string()));
                 }
             }
         }
@@ -248,7 +243,10 @@ pub async fn handle_status(github_token: Option<String>) -> Result<(), Error> {
 
     for name in &all_names {
         let release = all_entries.get(name).map(|e| e.as_slice()).unwrap_or(&[]);
-        let nightly = nightly_entries.get(name).map(|e| e.as_slice()).unwrap_or(&[]);
+        let nightly = nightly_entries
+            .get(name)
+            .map(|e| e.as_slice())
+            .unwrap_or(&[]);
 
         if release.is_empty() && nightly.is_empty() {
             continue;
@@ -279,7 +277,14 @@ pub async fn handle_status(github_token: Option<String>) -> Result<(), Error> {
         // Print release entries with aligned columns
         for entry in release {
             total += 1;
-            print_release_entry(entry, name, has_network_col, max_network_w, max_version_w, &mut update_count);
+            print_release_entry(
+                entry,
+                name,
+                has_network_col,
+                max_network_w,
+                max_version_w,
+                &mut update_count,
+            );
         }
 
         // Print nightly entries as simple lines
