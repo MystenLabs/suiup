@@ -1,3 +1,7 @@
+## 0.0.13 - 2026-04-07
+
+- Fixed status command version comparison by using proper semver parsing.
+
 ## 0.0.12 - 2026-04-06
 
 - Added `suiup status` command to check for available updates across all installed binaries.
