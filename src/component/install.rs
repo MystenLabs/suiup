@@ -42,6 +42,13 @@ pub async fn install_component(
         return Err(anyhow!("Debug flag is only available for the `sui` binary"));
     }
 
+    if config.experimental {
+        eprintln!(
+            "⚠️  {} is experimental: breaking changes are expected and it is not recommended for production workflows yet.",
+            config.name
+        );
+    }
+
     if nightly.is_some() && version.is_some() {
         return Err(anyhow!(
             "Cannot install from nightly and a release at the same time. Remove the version or the nightly flag"

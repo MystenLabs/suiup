@@ -64,6 +64,10 @@ impl Command {
         } = parse_component_with_version(name)?;
 
         let config = name.config();
+        if *debug && !config.supports_debug {
+            bail!("Debug flag is only available for the `sui` binary");
+        }
+
         let network =
             if !config.network_based || config.installation_type == InstallationType::Standalone {
                 if let Some(nightly) = nightly {

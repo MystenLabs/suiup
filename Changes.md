@@ -1,5 +1,6 @@
 ## 0.0.13 - 2026-04-07
 
+- Added support for installing the experimental `sui-fork` binary (without debug builds).
 - Fixed status command version comparison by using proper semver parsing.
 
 ## 0.0.12 - 2026-04-06
