@@ -5,7 +5,7 @@ mod test_utils;
 
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::TestEnv;
+    use crate::test_utils::{TestEnv, detect_os_arch_for_tests};
     use anyhow::Result;
     use assert_cmd::Command;
     use assert_cmd::cargo::cargo_bin_cmd;
@@ -467,6 +467,39 @@ mod tests {
         cmd.assert()
             .success()
             .stdout(predicate::str::contains("1.18.2"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_walrus_install_prefers_matching_cached_archive() -> Result<()> {
+        let test_env = TestEnv::new()?;
+        test_env.initialize_paths()?;
+
+        let (os, arch) = detect_os_arch_for_tests();
+        let version = "v1.48.1";
+        let sui_archive = format!("sui-testnet-{version}-{os}-{arch}.tgz");
+        let walrus_archive = format!("walrus-testnet-{version}-{os}-{arch}.tgz");
+
+        test_env.create_cached_archive(&sui_archive, "sui", b"sui payload")?;
+        test_env.create_cached_archive(&walrus_archive, "walrus", b"walrus payload")?;
+
+        let mut cmd = suiup_command(vec!["install", "walrus@testnet-v1.48.1", "-y"], &test_env);
+
+        #[cfg(windows)]
+        let extracted_binary = test_env
+            .data_dir
+            .join("suiup/binaries/testnet/walrus-v1.48.1.exe");
+        #[cfg(not(windows))]
+        let extracted_binary = test_env
+            .data_dir
+            .join("suiup/binaries/testnet/walrus-v1.48.1");
+
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains(format!("Found {walrus_archive} in cache")));
+
+        assert_eq!(fs::read(extracted_binary)?, b"walrus payload");
 
         Ok(())
     }

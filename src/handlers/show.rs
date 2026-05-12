@@ -30,8 +30,8 @@ fn load_default_binaries() -> Result<Binaries, Error> {
 fn load_installed_binaries() -> Result<Vec<BinaryVersion>, Error> {
     let installed_binaries = installed_binaries_grouped_by_network(None)?;
     let binaries = installed_binaries
-        .into_iter()
-        .flat_map(|(_, binaries)| binaries.to_owned())
+        .into_values()
+        .flat_map(|binaries| binaries.to_owned())
         .collect();
     Ok(binaries)
 }

@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{Result, anyhow};
+use flate2::Compression;
+use flate2::write::GzEncoder;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex, MutexGuard};
@@ -9,6 +11,7 @@ use suiup::paths::{
     get_cache_home, get_config_home, get_data_home, get_default_bin_dir, initialize,
 };
 use suiup::{remove_env_var, set_env_var};
+use tar::Builder;
 use tempfile::TempDir;
 
 pub struct TestEnv {
@@ -148,6 +151,40 @@ impl TestEnv {
 
         Ok(())
     }
+
+    pub fn create_cached_archive(
+        &self,
+        filename: &str,
+        binary_name: &str,
+        contents: &[u8],
+    ) -> Result<PathBuf> {
+        let _guard = ZIP_FILES_MUTEX
+            .lock()
+            .expect("failed to lock zip-files mutex");
+        let releases_dir = self.cache_dir.join("suiup").join("releases");
+        std::fs::create_dir_all(&releases_dir)?;
+
+        let archive_path = releases_dir.join(filename);
+        let file = std::fs::File::create(&archive_path)?;
+        let encoder = GzEncoder::new(file, Compression::default());
+        let mut builder = Builder::new(encoder);
+
+        #[cfg(windows)]
+        let entry_name = format!("{binary_name}.exe");
+        #[cfg(not(windows))]
+        let entry_name = binary_name.to_string();
+
+        let mut header = tar::Header::new_gnu();
+        header.set_mode(0o755);
+        header.set_size(contents.len() as u64);
+        header.set_cksum();
+        builder.append_data(&mut header, entry_name, contents)?;
+
+        let encoder = builder.into_inner()?;
+        encoder.finish()?;
+
+        Ok(archive_path)
+    }
 }
 
 impl Drop for TestEnv {
@@ -162,7 +199,7 @@ impl Drop for TestEnv {
     }
 }
 
-fn detect_os_arch_for_tests() -> (&'static str, &'static str) {
+pub(crate) fn detect_os_arch_for_tests() -> (&'static str, &'static str) {
     let os = if cfg!(target_os = "macos") {
         "macos"
     } else if cfg!(target_os = "linux") {
