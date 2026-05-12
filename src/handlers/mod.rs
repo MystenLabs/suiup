@@ -305,6 +305,7 @@ fn extract_component(orig_binary: &str, network: String, filename: &str) -> Resu
     let binary = orig_binary.to_string();
     #[cfg(windows)]
     let binary = format!("{}.exe", orig_binary);
+    let mut extracted = false;
 
     // Check if the current entry matches the file name
     for file in archive
@@ -368,8 +369,17 @@ fn extract_component(orig_binary: &str, network: String, filename: &str) -> Resu
                         })?;
                 }
             }
+            extracted = true;
             break;
         }
+    }
+
+    if !extracted {
+        return Err(anyhow!(
+            "Binary '{}' not found in release archive {}",
+            binary,
+            filename
+        ));
     }
 
     Ok(())
@@ -430,9 +440,13 @@ pub fn installed_binaries_grouped_by_network(
 mod tests {
     use super::check_if_binaries_exist;
     use crate::paths::binaries_dir;
+    use crate::paths::release_archive_dir;
+    use flate2::Compression;
+    use flate2::write::GzEncoder;
     use std::fs::{self, File};
     use std::io::Write;
     use std::path::PathBuf;
+    use tar::Builder;
 
     // --- Tests -----------------------------------------------------------------
     // Internal helper (exposed for tests inside this module) to build the final path; this
@@ -512,6 +526,61 @@ mod tests {
         assert!(exists, "Binary should be detected as existing");
 
         // Restore original environment variable (best effort).
+        if let Some(val) = original {
+            crate::set_env_var!(var, val);
+        } else {
+            crate::remove_env_var!(var);
+        }
+    }
+
+    fn create_test_archive(archive_path: &std::path::Path, entries: &[(&str, &[u8])]) {
+        let file = File::create(archive_path).unwrap();
+        let encoder = GzEncoder::new(file, Compression::default());
+        let mut builder = Builder::new(encoder);
+
+        for (name, contents) in entries {
+            let mut header = tar::Header::new_gnu();
+            header.set_mode(0o755);
+            header.set_size(contents.len() as u64);
+            header.set_cksum();
+            builder
+                .append_data(&mut header, name, &contents[..])
+                .unwrap();
+        }
+
+        let encoder = builder.into_inner().unwrap();
+        encoder.finish().unwrap();
+    }
+
+    #[test]
+    fn test_extract_component_errors_when_binary_missing_from_archive() {
+        let temp = tempfile::TempDir::new().unwrap();
+        #[cfg(windows)]
+        let (var, original) = ("LOCALAPPDATA", std::env::var("LOCALAPPDATA").ok());
+        #[cfg(not(windows))]
+        let (var, original) = ("XDG_CACHE_HOME", std::env::var("XDG_CACHE_HOME").ok());
+        crate::set_env_var!(var, temp.path());
+
+        let releases_dir = release_archive_dir();
+        fs::create_dir_all(&releases_dir).unwrap();
+
+        let filename = "sui-testnet-v1.48.1-macos-arm64.tgz";
+        let archive_path = releases_dir.join(filename);
+        #[cfg(windows)]
+        let archive_entry = "sui.exe";
+        #[cfg(not(windows))]
+        let archive_entry = "sui";
+        create_test_archive(&archive_path, &[(archive_entry, b"sui payload")]);
+
+        let error =
+            super::extract_component("walrus", "testnet".to_string(), filename).unwrap_err();
+        let error_message = error.to_string();
+
+        #[cfg(windows)]
+        assert!(error_message.contains("Binary 'walrus.exe' not found"));
+        #[cfg(not(windows))]
+        assert!(error_message.contains("Binary 'walrus' not found"));
+
         if let Some(val) = original {
             crate::set_env_var!(var, val);
         } else {

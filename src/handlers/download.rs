@@ -1,12 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::handlers::release::{
-    ensure_version_prefix, find_last_release_by_network, find_networks_with_version,
-};
+use crate::handlers::release::{ensure_version_prefix, find_networks_with_version};
 use crate::handlers::version::extract_version_from_release;
 use crate::registry::BinaryConfig;
-use crate::{handlers::release::release_list, paths::release_archive_dir, types::Release};
+use crate::{
+    handlers::release::release_list,
+    paths::release_archive_dir,
+    types::{Asset, Release},
+};
 use anyhow::{Context, Error, anyhow, bail};
 use futures_util::StreamExt;
 use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
@@ -22,8 +24,57 @@ use std::{cmp::min, io::Write, path::PathBuf, time::Instant};
 
 use tracing::debug;
 
+fn archive_prefix(config: &BinaryConfig) -> &str {
+    if config.shared_repo_binary {
+        config.repository.rsplit('/').next().unwrap_or(&config.name)
+    } else {
+        &config.name
+    }
+}
+
+fn archive_filename_matches(
+    config: &BinaryConfig,
+    filename: &str,
+    network: &str,
+    version: Option<&str>,
+    os: &str,
+    arch: &str,
+) -> bool {
+    let prefix = match version {
+        Some(version) => format!(
+            "{}-{}-{}-",
+            archive_prefix(config),
+            network,
+            ensure_version_prefix(version)
+        ),
+        None => format!("{}-{network}-", archive_prefix(config)),
+    };
+    let tgz_suffix = format!("-{os}-{arch}.tgz");
+    let zip_suffix = format!("-{os}-{arch}.zip");
+
+    filename.starts_with(&prefix)
+        && (filename.ends_with(&tgz_suffix) || filename.ends_with(&zip_suffix))
+        && (version.is_some() || extract_version_from_release(filename).is_ok())
+}
+
+fn find_matching_asset<'a>(
+    release: &'a Release,
+    config: &BinaryConfig,
+    network: &str,
+    version: Option<&str>,
+    os: &str,
+    arch: &str,
+) -> Option<&'a Asset> {
+    release
+        .assets
+        .iter()
+        .find(|asset| archive_filename_matches(config, &asset.name, network, version, os, arch))
+}
+
 fn find_cached_release_archive(
-    tag: &str,
+    config: &BinaryConfig,
+    network: &str,
+    version: &str,
     os: &str,
     arch: &str,
 ) -> Result<Option<String>, anyhow::Error> {
@@ -39,11 +90,7 @@ fn find_cached_release_archive(
             entry.with_context(|| format!("Cannot read entry in {}", cache_dir.display()))?;
         let filename = entry.file_name().to_string_lossy().to_string();
 
-        if filename.contains(tag)
-            && filename.contains(os)
-            && filename.contains(arch)
-            && (filename.ends_with(".tgz") || filename.ends_with(".zip"))
-        {
+        if archive_filename_matches(config, &filename, network, Some(version), os, arch) {
             return Ok(Some(filename));
         }
     }
@@ -159,7 +206,7 @@ pub async fn download_release_at_version(
 
     let tag = format!("{}-{}", network, version);
 
-    if let Some(filename) = find_cached_release_archive(&tag, &os, &arch)? {
+    if let Some(filename) = find_cached_release_archive(config, network, &version, &os, &arch)? {
         println!("Found {filename} in cache");
         return Ok(filename);
     }
@@ -172,9 +219,18 @@ pub async fn download_release_at_version(
 
     if let Some(release) = releases
         .iter()
-        .find(|r| r.assets.iter().any(|a| a.name.contains(&tag)))
+        .find(|r| find_matching_asset(r, config, network, Some(&version), &os, &arch).is_some())
     {
-        download_asset_from_github(release, &os, &arch, github_token).await
+        download_asset_from_github(
+            release,
+            config,
+            network,
+            Some(&version),
+            &os,
+            &arch,
+            github_token,
+        )
+        .await
     } else {
         headers.insert(USER_AGENT, HeaderValue::from_static("suiup"));
 
@@ -206,7 +262,16 @@ pub async fn download_release_at_version(
         }
 
         let release: Release = parse_json_response(response, &url, "GitHub release").await?;
-        download_asset_from_github(&release, &os, &arch, github_token).await
+        download_asset_from_github(
+            &release,
+            config,
+            network,
+            Some(&version),
+            &os,
+            &arch,
+            github_token,
+        )
+        .await
     }
 }
 
@@ -223,16 +288,28 @@ pub async fn download_latest_release(
 
     let (os, arch) = detect_os_arch()?;
 
-    let last_release = find_last_release_by_network(releases.0.clone(), network)
-        .await
+    let last_release = releases
+        .0
+        .iter()
+        .find(|release| find_matching_asset(release, config, network, None, &os, &arch).is_some())
         .ok_or_else(|| generate_network_suggestions_error(config, &releases.0, None, network))?;
+    let asset =
+        find_matching_asset(last_release, config, network, None, &os, &arch).ok_or_else(|| {
+            anyhow!(
+                "Asset not found for {} on {} {}-{}",
+                config.name,
+                network,
+                os,
+                arch
+            )
+        })?;
 
     println!(
         "Last {network} release: {}",
-        extract_version_from_release(&last_release.assets[0].name)?
+        extract_version_from_release(&asset.name)?
     );
 
-    download_asset_from_github(&last_release, &os, &arch, github_token).await
+    download_asset(asset, github_token).await
 }
 
 pub async fn download_file(
@@ -426,16 +503,36 @@ where
 /// architecture and OS
 async fn download_asset_from_github(
     release: &Release,
+    config: &BinaryConfig,
+    network: &str,
+    version: Option<&str>,
     os: &str,
     arch: &str,
     github_token: Option<String>,
 ) -> Result<String, anyhow::Error> {
-    let asset = release
-        .assets
-        .iter()
-        .find(|&a| a.name.contains(arch) && a.name.contains(os.to_string().to_lowercase().as_str()))
-        .ok_or_else(|| anyhow!("Asset not found for {os}-{arch}"))?;
+    let asset =
+        find_matching_asset(release, config, network, version, os, arch).ok_or_else(|| {
+            let version_display = version
+                .map(ensure_version_prefix)
+                .map(|version| format!(" {version}"))
+                .unwrap_or_default();
+            anyhow!(
+                "Asset not found for {} {}{} {}-{}",
+                config.name,
+                network,
+                version_display,
+                os,
+                arch
+            )
+        })?;
 
+    download_asset(asset, github_token).await
+}
+
+async fn download_asset(
+    asset: &Asset,
+    github_token: Option<String>,
+) -> Result<String, anyhow::Error> {
     let url = asset.clone().browser_download_url;
     let name = asset.clone().name;
     let path = release_archive_dir();
@@ -461,6 +558,63 @@ mod tests {
                 })
                 .collect(),
         }
+    }
+
+    #[test]
+    fn test_cached_archive_matches_binary_prefix() {
+        let config = BinaryRegistry::global().get("walrus").unwrap();
+
+        assert!(archive_filename_matches(
+            config,
+            "walrus-testnet-v1.48.1-macos-arm64.tgz",
+            "testnet",
+            Some("v1.48.1"),
+            "macos",
+            "arm64"
+        ));
+        assert!(!archive_filename_matches(
+            config,
+            "sui-testnet-v1.48.1-macos-arm64.tgz",
+            "testnet",
+            Some("v1.48.1"),
+            "macos",
+            "arm64"
+        ));
+    }
+
+    #[test]
+    fn test_cached_archive_matches_shared_repo_prefix() {
+        let config = BinaryRegistry::global().get("sui-node").unwrap();
+
+        assert!(archive_filename_matches(
+            config,
+            "sui-testnet-v1.39.3-macos-arm64.tgz",
+            "testnet",
+            Some("v1.39.3"),
+            "macos",
+            "arm64"
+        ));
+    }
+
+    #[test]
+    fn test_find_matching_asset_prefers_requested_binary() {
+        let config = BinaryRegistry::global().get("walrus").unwrap();
+        let release = create_test_release(vec![
+            "sui-testnet-v1.48.1-macos-arm64.tgz",
+            "walrus-testnet-v1.48.1-macos-arm64.tgz",
+        ]);
+
+        let asset = find_matching_asset(
+            &release,
+            config,
+            "testnet",
+            Some("v1.48.1"),
+            "macos",
+            "arm64",
+        )
+        .unwrap();
+
+        assert_eq!(asset.name, "walrus-testnet-v1.48.1-macos-arm64.tgz");
     }
 
     #[test]
