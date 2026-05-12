@@ -497,7 +497,9 @@ mod tests {
 
         cmd.assert()
             .success()
-            .stdout(predicate::str::contains(format!("Found {walrus_archive} in cache")));
+            .stdout(predicate::str::contains(format!(
+                "Found {walrus_archive} in cache"
+            )));
 
         assert_eq!(fs::read(extracted_binary)?, b"walrus payload");
 

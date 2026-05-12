@@ -65,9 +65,10 @@ fn find_matching_asset<'a>(
     os: &str,
     arch: &str,
 ) -> Option<&'a Asset> {
-    release.assets.iter().find(|asset| {
-        archive_filename_matches(config, &asset.name, network, version, os, arch)
-    })
+    release
+        .assets
+        .iter()
+        .find(|asset| archive_filename_matches(config, &asset.name, network, version, os, arch))
 }
 
 fn find_cached_release_archive(
@@ -292,8 +293,8 @@ pub async fn download_latest_release(
         .iter()
         .find(|release| find_matching_asset(release, config, network, None, &os, &arch).is_some())
         .ok_or_else(|| generate_network_suggestions_error(config, &releases.0, None, network))?;
-    let asset = find_matching_asset(last_release, config, network, None, &os, &arch).ok_or_else(
-        || {
+    let asset =
+        find_matching_asset(last_release, config, network, None, &os, &arch).ok_or_else(|| {
             anyhow!(
                 "Asset not found for {} on {} {}-{}",
                 config.name,
@@ -301,8 +302,7 @@ pub async fn download_latest_release(
                 os,
                 arch
             )
-        },
-    )?;
+        })?;
 
     println!(
         "Last {network} release: {}",
@@ -510,8 +510,8 @@ async fn download_asset_from_github(
     arch: &str,
     github_token: Option<String>,
 ) -> Result<String, anyhow::Error> {
-    let asset = find_matching_asset(release, config, network, version, os, arch).ok_or_else(
-        || {
+    let asset =
+        find_matching_asset(release, config, network, version, os, arch).ok_or_else(|| {
             let version_display = version
                 .map(ensure_version_prefix)
                 .map(|version| format!(" {version}"))
@@ -524,13 +524,15 @@ async fn download_asset_from_github(
                 os,
                 arch
             )
-        },
-    )?;
+        })?;
 
     download_asset(asset, github_token).await
 }
 
-async fn download_asset(asset: &Asset, github_token: Option<String>) -> Result<String, anyhow::Error> {
+async fn download_asset(
+    asset: &Asset,
+    github_token: Option<String>,
+) -> Result<String, anyhow::Error> {
     let url = asset.clone().browser_download_url;
     let name = asset.clone().name;
     let path = release_archive_dir();

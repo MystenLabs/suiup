@@ -445,8 +445,8 @@ mod tests {
     use flate2::write::GzEncoder;
     use std::fs::{self, File};
     use std::io::Write;
-    use tar::Builder;
     use std::path::PathBuf;
+    use tar::Builder;
 
     // --- Tests -----------------------------------------------------------------
     // Internal helper (exposed for tests inside this module) to build the final path; this
@@ -543,7 +543,9 @@ mod tests {
             header.set_mode(0o755);
             header.set_size(contents.len() as u64);
             header.set_cksum();
-            builder.append_data(&mut header, name, &contents[..]).unwrap();
+            builder
+                .append_data(&mut header, name, &contents[..])
+                .unwrap();
         }
 
         let encoder = builder.into_inner().unwrap();
