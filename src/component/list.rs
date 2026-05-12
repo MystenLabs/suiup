@@ -12,12 +12,26 @@ pub fn list_components() -> Result<()> {
     let mut table = Table::new();
     table
         .load_preset(TABLE_FORMAT)
-        .set_header(vec![Cell::new("Binary"), Cell::new("Description")])
+        .set_header(vec![
+            Cell::new("Binary"),
+            Cell::new("Description"),
+            Cell::new("Notes"),
+        ])
         .add_rows(
             registry
                 .all()
                 .iter()
-                .map(|config| vec![Cell::new(&config.name), Cell::new(&config.description)])
+                .map(|config| {
+                    vec![
+                        Cell::new(&config.name),
+                        Cell::new(&config.description),
+                        Cell::new(if config.experimental {
+                            "Experimental; breaking changes expected; not recommended for production"
+                        } else {
+                            ""
+                        }),
+                    ]
+                })
                 .collect::<Vec<Vec<Cell>>>(),
         );
     println!("{table}");
