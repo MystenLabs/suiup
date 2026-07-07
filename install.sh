@@ -25,15 +25,15 @@ get_latest_version() {
 
     if command -v curl >/dev/null 2>&1; then
         if [ -n "$auth_header" ]; then
-            curl -fsSL -H "$auth_header" "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | grep '"tag_name":' | sed 's/.*"tag_name": "\([^"]*\)".*/\1/'
+            curl -fsSL -H "$auth_header" "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | grep '"tag_name":' | sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p'
         else
-            curl -fsSL "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | grep '"tag_name":' | sed 's/.*"tag_name": "\([^"]*\)".*/\1/'
+            curl -fsSL "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | grep '"tag_name":' | sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p'
         fi
     elif command -v wget >/dev/null 2>&1; then
         if [ -n "$auth_header" ]; then
-            wget --quiet --header="$auth_header" -O- "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | grep '"tag_name":' | sed 's/.*"tag_name": "\([^"]*\)".*/\1/'
+            wget --quiet --header="$auth_header" -O- "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | grep '"tag_name":' | sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p'
         else
-            wget --quiet -O- "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | grep '"tag_name":' | sed 's/.*"tag_name": "\([^"]*\)".*/\1/'
+            wget --quiet -O- "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | grep '"tag_name":' | sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p'
         fi
     else
         printf '%bError: Neither curl nor wget is available. Please install one of them.%b\n' "${RED}" "${NC}"
