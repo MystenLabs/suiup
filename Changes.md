@@ -1,7 +1,14 @@
+## 0.0.14 - 2026-07-08
+
+- Reworked the `suiup update` command. It will now update only the requested binary, instead of all binaries, and it will respect
+the network that the binary is active for (e.g., if sui@testnet is active, then `suiup update sui` will update the testnet version of Sui, not the mainnet version).
+The new binary version will become the default one automatically.
+- Removed support for `sui-fork` until further notice.
+
 ## 0.0.13 - 2026-04-07
 
-- Added support for installing the experimental `sui-fork` binary (without debug builds).
-- Fixed status command version comparison by using proper semver parsing.
+- added support for installing the experimental `sui-fork` binary (without debug builds).
+- fixed status command version comparison by using proper semver parsing.
 
 ## 0.0.12 - 2026-04-06
 
