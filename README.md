@@ -1,7 +1,7 @@
 # Suiup - the installer and manager for CLI tools in the Sui ecosystem
 
 
-`suiup` is a tool to install and manage different versions of CLI tools for working in the Sui ecosystem. It allows you to easily install and switch between different versions of `sui`, `sui-node`, `sui-fork`, `mvr`, `seal`, `walrus`, `site-builder`, `move-analyzer`, `ledger-signer`, and `yubikey-signer`.
+`suiup` is a tool to install and manage different versions of CLI tools for working in the Sui ecosystem. It allows you to easily install and switch between different versions of `sui`, `sui-node`, `mvr`, `seal`, `walrus`, `site-builder`, `move-analyzer`, `ledger-signer`, and `yubikey-signer`.
 After installation, run `suiup list` to find which binaries you can install. Check out the [Installation](#installation) to install and the [Quick Start](#quick-start) guide for how-to-use examples.
 
 # Why suiup?
@@ -14,7 +14,7 @@ As new tools like [mvr](https://docs.suins.io/move-registry#using-mvr) and [walr
 
 With `suiup`, you can:
 
-- Install specific versions of `sui`, `sui-node`, `sui-fork`, `mvr`, `seal`, `walrus`, `site-builder`, `move-analyzer`, `ledger-signer`, and `yubikey-signer`
+- Install specific versions of `sui`, `sui-node`, `mvr`, `seal`, `walrus`, `site-builder`, `move-analyzer`, `ledger-signer`, and `yubikey-signer`
 - Install from a branch in the repository to try unreleased features or fixes
 - Get debug builds of `sui` (needed for commands like `sui move test --coverage`)
 - List and switch between installed binaries for different networks (e.g., devnet vs mainnet)
@@ -27,7 +27,6 @@ These are the binary names you can pass to `suiup install`:
 | Binary            | Example command                         | Source repository                            |
 | ----------------- | --------------------------------------- | -------------------------------------------- |
 | `sui`             | `suiup install sui@testnet`             | `MystenLabs/sui`                             |
-| `sui-fork`        | `suiup install sui-fork@testnet`        | `MystenLabs/sui`                             |
 | `mvr`             | `suiup install mvr`                     | `MystenLabs/mvr`                             |
 | `seal`            | `suiup install seal`                    | `MystenLabs/seal`                            |
 | `walrus`          | `suiup install walrus@mainnet`          | `MystenLabs/walrus`                          |
@@ -37,9 +36,6 @@ These are the binary names you can pass to `suiup install`:
 | `yubikey-signer`  | `suiup install yubikey-signer`          | `MystenLabs/rust-signers`                    |
 
 Run `suiup list` to see the currently available binaries from your installed `suiup` version.
-
-> [!WARNING]
-> `sui-fork` is experimental. Breaking changes are expected, and it is not recommended for production workflows yet.
 
 # Supported OS (for suiup tool, but not necessarily for the binaries it installs)
 
@@ -151,16 +147,6 @@ suiup install move-analyzer@mainnet
 suiup install sui-node
 suiup install sui-node@testnet-1.40.1 # install a specific version
 ```
-
-### Install `sui-fork` (experimental tool)
-
-```bash
-suiup install sui-fork
-suiup install sui-fork@testnet-1.72.0 # install a specific version
-```
-
-> [!WARNING]
-> `sui-fork` does not support debug builds. It is experimental, breaking changes are expected, and it is not recommended for production workflows yet.
 
 ### List available binaries to install
 
