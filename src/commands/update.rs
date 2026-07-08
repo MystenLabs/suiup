@@ -9,11 +9,12 @@ use crate::handlers::update::handle_update;
 /// Update binary.
 #[derive(Args, Debug)]
 pub struct Command {
-    /// Binary to update (e.g. 'sui', 'mvr', 'walrus'). By default, it will update the default
-    /// binary version. For updating a specific release, use the `sui@testnet` form.
+    /// Binary to update (e.g. 'sui', 'mvr', 'walrus'). By default, it updates the currently
+    /// active binary for its network and sets the new version as the default. To update a
+    /// specific network, use the `sui@testnet` form.
     name: String,
 
-    /// Accept defaults without prompting
+    /// Deprecated: an update always sets the new version as the default, so this has no effect.
     #[arg(short, long)]
     yes: bool,
 }
