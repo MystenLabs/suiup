@@ -108,11 +108,12 @@ suiup install sui@testnet-1.40.1 # this will install the testnet v1.40.1 release
 
 ### Update `sui` to latest version
 
-This will check for newer releases of those that are already installed, and then download the new ones. Recommended to specify which release to update.
+This will check for newer releases for the specified binary and update the default binary to the latest version.
 
 ```bash
-suiup update sui@devnet # recommended
-suiup update sui # alternative - not recommended, as it will update/install the latest testnet release
+suiup update sui (e.g., if default sui is mainnet, it will update to the latest mainnet release binary and make that default)
+suiup update sui@testnet (e.g., if default sui is mainnet, it will update to the latest testnet release binary and make that default)
+suiup update mvr
 ```
 
 ### Install `sui` binary to specific default directory
