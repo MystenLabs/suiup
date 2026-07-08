@@ -128,7 +128,9 @@ pub async fn handle_update(
     let releases = release_list(&config.repository, github_token.clone())
         .await?
         .0;
-    let latest = last_release_for_network(&releases, &target_network).await?.1;
+    let latest = last_release_for_network(&releases, &target_network)
+        .await?
+        .1;
     if local_version == latest {
         println!("[{target_network} release] {name} is up to date");
         return Ok(());
