@@ -82,6 +82,24 @@ pub fn update_default_version_file(
     Ok(())
 }
 
+/// Returns the currently-active (network, version, debug) for a binary, if any, as recorded in
+/// the default version file.
+pub fn default_version_for(binary_name: &str) -> Result<Option<(String, Version, bool)>, Error> {
+    let path = default_file_path()?;
+    let file = File::open(&path)
+        .with_context(|| format!("Cannot open default version file {}", path.display()))?;
+    let reader = BufReader::new(file);
+    let map: BTreeMap<String, (String, Version, bool)> =
+        serde_json::from_reader(reader).map_err(|e| {
+            anyhow!(
+                "Cannot deserialize default version file {}: {e}",
+                path.display()
+            )
+        })?;
+
+    Ok(map.get(binary_name).cloned())
+}
+
 /// Prompts the user and asks if they want to update the default version with the one that was just
 /// installed.
 pub fn update_after_install(
