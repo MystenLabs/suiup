@@ -9,7 +9,7 @@ anyhow = "1.0"
 clap = { version = "4.5", features = ["derive", "env"] }
 clap_complete = "4.5"
 colored = "3.1.1"
-comfy-table = "7.2.2"
+comfy-table = "8.0.0"
 console = { version = "0.16", features = ["windows-console-colors"] }
 dirs = "6.0.0"
 env_logger = "0.11.8"
