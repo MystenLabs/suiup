@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::commands::TABLE_FORMAT;
+use crate::commands::TABLE_STYLE;
 use crate::registry::BinaryRegistry;
 use anyhow::Result;
 use comfy_table::*;
@@ -11,7 +11,7 @@ pub fn list_components() -> Result<()> {
     let registry = BinaryRegistry::global();
     let mut table = Table::new();
     table
-        .load_preset(TABLE_FORMAT)
+        .load_style(TABLE_STYLE)
         .set_header(vec![
             Cell::new("Binary"),
             Cell::new("Description"),

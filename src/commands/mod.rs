@@ -19,8 +19,12 @@ use crate::{handlers::self_::check_for_updates, types::BinaryVersion};
 
 use anyhow::{Result, anyhow, bail};
 use clap::{Parser, Subcommand};
-use comfy_table::Table;
+use comfy_table::{LineStyle, Table, TableStyle};
 pub const TABLE_FORMAT: &str = "  ── ══      ──    ";
+pub(crate) const TABLE_STYLE: TableStyle = TableStyle::new()
+    .top_border(LineStyle::none().fill('─').junction('─'))
+    .header_separator(LineStyle::none().fill('═').junction('═'))
+    .bottom_border(LineStyle::none().fill('─').junction('─'));
 #[derive(Parser)]
 #[command(arg_required_else_help = true, disable_help_subcommand = true)]
 #[command(version, about)]
@@ -223,7 +227,7 @@ pub fn print_table(binaries: &[BinaryVersion]) {
     binaries_vec.sort_by_key(|b| b.binary_name.clone());
     let mut table = Table::new();
     table
-        .load_preset(TABLE_FORMAT)
+        .load_style(TABLE_STYLE)
         .set_header(vec!["Binary", "Release/Branch", "Version", "Debug"])
         .add_rows(
             binaries_vec
@@ -253,6 +257,20 @@ mod tests {
     #[test]
     fn verify_command() {
         super::Command::command().debug_assert();
+    }
+
+    #[test]
+    fn table_style_preserves_condensed_horizontal_lines() {
+        let mut table = comfy_table::Table::new();
+        table
+            .load_style(super::TABLE_STYLE)
+            .set_header(vec!["A", "B"])
+            .add_rows(vec![vec!["1", "2"], vec!["3", "4"]]);
+
+        assert_eq!(
+            table.to_string(),
+            "───────\n A   B \n═══════\n 1   2 \n 3   4 \n───────"
+        );
     }
 
     #[test]
