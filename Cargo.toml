@@ -6,21 +6,21 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0"
-clap = { version = "4.6.6", features = ["derive", "env"] }
-clap_complete = "4.6.9"
+clap = { version = "4.6.7", features = ["derive", "env"] }
+clap_complete = "4.6.11"
 colored = "3.1.1"
-comfy-table = "8.0.0"
+comfy-table = "8.0.1"
 console = { version = "0.16", features = ["windows-console-colors"] }
-dirs = "6.0.0"
+dirs = "7.0.0"
 env_logger = "0.11.11"
 log = "0.4.34"
 flate2 = "1.1.10"
 futures-util = "0.3.34"
 indicatif = "0.18"
-lazy_static = "1.5.0"
+lazy_static = "1.5.1"
 regex = "1.13.1"
 md5 = "0.8"
-reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json", "stream", "rustls"] }
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "json", "stream", "rustls"] }
 semver = "1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.151"
