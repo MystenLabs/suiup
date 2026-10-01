@@ -1,3 +1,7 @@
+## Unreleased
+
+- Fixed `suiup remove` aborting when an installed binary is missing from disk. Removal now clears missing entries and saves the updated installed and default binary lists.
+
 ## 0.0.14 - 2026-07-08
 
 - Reworked the `suiup update` command. It will now update only the requested binary, instead of all binaries, and it will respect
