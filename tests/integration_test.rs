@@ -180,6 +180,75 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn test_sui_fork_install_from_shared_archive() -> Result<()> {
+        let test_env = TestEnv::new()?;
+        let (os, arch) = detect_os_arch_for_tests();
+        let archive = format!("sui-testnet-v1.81.0-{os}-{arch}.tgz");
+        test_env.create_cached_archive(&archive, "sui-fork", b"sui-fork payload")?;
+
+        suiup_command(vec!["install", "sui-fork@testnet-v1.81.0", "-y"], &test_env)
+            .env("SUIUP_DEFAULT_BIN_DIR", &test_env.bin_dir)
+            .assert()
+            .success();
+
+        let suffix = std::env::consts::EXE_SUFFIX;
+        let installed_path = test_env
+            .data_dir
+            .join(format!("suiup/binaries/testnet/sui-fork-v1.81.0{suffix}"));
+        let default_path = test_env.bin_dir.join(format!("sui-fork{suffix}"));
+        assert_eq!(fs::read(&installed_path)?, b"sui-fork payload");
+        assert_eq!(fs::read(&default_path)?, b"sui-fork payload");
+        let installed: suiup::types::InstalledBinaries = serde_json::from_slice(&fs::read(
+            test_env.config_dir.join("suiup/installed_binaries.json"),
+        )?)?;
+        assert_eq!(installed.binaries().len(), 1);
+        let binary = &installed.binaries()[0];
+        assert_eq!(binary.binary_name, "sui-fork");
+        assert_eq!(binary.network_release, "testnet");
+        assert_eq!(binary.version, "v1.81.0");
+        assert!(!binary.debug);
+        assert_eq!(
+            binary.path.as_deref().map(std::path::Path::new),
+            Some(installed_path.as_path())
+        );
+
+        suiup_command(
+            vec!["default", "set", "sui-fork@testnet-v1.81.0"],
+            &test_env,
+        )
+        .env("SUIUP_DEFAULT_BIN_DIR", &test_env.bin_dir)
+        .assert()
+        .success();
+        assert_eq!(fs::read(default_path)?, b"sui-fork payload");
+        let defaults: serde_json::Value = serde_json::from_slice(&fs::read(
+            test_env.config_dir.join("suiup/default_version.json"),
+        )?)?;
+        assert_eq!(
+            defaults["sui-fork"],
+            serde_json::json!(["testnet", "v1.81.0", false])
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_sui_fork_rejects_prebuilt_debug_versions() -> Result<()> {
+        let test_env = TestEnv::new()?;
+        for args in [
+            vec!["install", "sui-fork@testnet-v1.81.0", "--debug", "-y"],
+            vec!["default", "set", "sui-fork@testnet-v1.81.0", "--debug"],
+        ] {
+            suiup_command(args, &test_env)
+                .env("SUIUP_DEFAULT_BIN_DIR", &test_env.bin_dir)
+                .assert()
+                .failure()
+                .stderr(predicate::str::contains(
+                    "Debug flag is only available for the `sui` binary",
+                ));
+        }
+        Ok(())
+    }
+
     #[tokio::test]
     async fn test_install_nightly() -> Result<()> {
         Ok(())

@@ -184,6 +184,7 @@ mod tests {
         for name in &[
             "sui",
             "sui-node",
+            "sui-fork",
             "mvr",
             "seal",
             "walrus",
@@ -211,6 +212,20 @@ mod tests {
         assert!(config.supported_networks.contains(&"testnet".to_string()));
         assert!(config.supported_networks.contains(&"devnet".to_string()));
         assert!(config.supported_networks.contains(&"mainnet".to_string()));
+    }
+
+    #[test]
+    fn sui_fork_config_values() {
+        let config = BinaryRegistry::global().get("sui-fork").unwrap();
+        assert_eq!(config.repository, "MystenLabs/sui");
+        assert_eq!(config.installation_type, InstallationType::Archive);
+        assert!(config.network_based);
+        assert_eq!(config.default_network, "testnet");
+        assert_eq!(config.supported_networks, ["testnet", "devnet", "mainnet"]);
+        assert!(!config.supports_debug);
+        assert!(config.shared_repo_binary);
+        assert!(config.experimental);
+        assert!(BinaryName::new("sui-fork").is_ok());
     }
 
     #[test]

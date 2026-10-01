@@ -1,7 +1,7 @@
-## Unreleased
+## 0.1.0 - 2026-10-01
 
+- Added support for installing the experimental `sui-fork` binary (without debug builds).
 - Fixed `suiup remove` treating directories as executables. Removal now checks for non-file paths before deleting binaries and saves completed removals even if a later deletion or default-file update fails.
-
 - Fixed `suiup remove` aborting when an installed binary is missing from disk. Removal now clears missing entries and saves the updated installed and default binary lists.
 - Changed `suiup remove` to preserve the active version and default executable. If the active version's stored file is missing, its installed entry is removed, but any existing default executable and its setting are kept.
 
@@ -14,7 +14,6 @@ The new binary version will become the default one automatically.
 
 ## 0.0.13 - 2026-04-07
 
-- added support for installing the experimental `sui-fork` binary (without debug builds).
 - fixed status command version comparison by using proper semver parsing.
 
 ## 0.0.12 - 2026-04-06
