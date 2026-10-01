@@ -208,7 +208,10 @@ mod tests {
         assert_eq!(binary.network_release, "testnet");
         assert_eq!(binary.version, "v1.81.0");
         assert!(!binary.debug);
-        assert_eq!(binary.path.as_deref(), installed_path.to_str());
+        assert_eq!(
+            binary.path.as_deref().map(std::path::Path::new),
+            Some(installed_path.as_path())
+        );
 
         suiup_command(
             vec!["default", "set", "sui-fork@testnet-v1.81.0"],

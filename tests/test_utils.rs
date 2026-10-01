@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use flate2::Compression;
 use flate2::write::GzEncoder;
 use std::env;
@@ -33,36 +33,20 @@ impl TestEnv {
         let temp_dir = TempDir::new()?;
         let base = temp_dir.path();
 
-        let home_dir = dirs::home_dir().ok_or_else(|| anyhow!("HOME directory is not set"))?;
-
-        let data_home = get_data_home();
-        let config_home = get_config_home();
-        let cache_home = get_cache_home();
-        let bin_home = get_default_bin_dir();
-
-        let data_dir = if let Ok(path) = data_home.strip_prefix(&home_dir) {
-            base.join(path)
-        } else {
-            base.join(data_home)
-        };
-
-        let config_dir = if let Ok(path) = config_home.strip_prefix(&home_dir) {
-            base.join(path)
-        } else {
-            base.join(config_home)
-        };
-
-        let cache_dir = if let Ok(path) = cache_home.strip_prefix(&home_dir) {
-            base.join(path)
-        } else {
-            base.join(cache_home)
-        };
-
-        let bin_dir = if let Ok(path) = bin_home.strip_prefix(&home_dir) {
-            base.join(path)
-        } else {
-            base.join(bin_home)
-        };
+        // Inherited absolute paths must never replace the temporary root.
+        #[cfg(windows)]
+        let data_dir = base.join("AppData").join("Local");
+        #[cfg(not(windows))]
+        let data_dir = base.join(".local").join("share");
+        #[cfg(windows)]
+        let config_dir = data_dir.clone();
+        #[cfg(not(windows))]
+        let config_dir = base.join(".config");
+        let cache_dir = base.join("cache");
+        #[cfg(windows)]
+        let bin_dir = data_dir.join("bin");
+        #[cfg(not(windows))]
+        let bin_dir = base.join(".local").join("bin");
 
         // Create directories
         std::fs::create_dir_all(&data_dir)?;
@@ -82,6 +66,8 @@ impl TestEnv {
             "XDG_DATA_HOME",
             "XDG_CONFIG_HOME",
             "XDG_CACHE_HOME",
+            "TEMP",
+            "SUIUP_DEFAULT_BIN_DIR",
             "PATH",
         ];
 
@@ -93,12 +79,16 @@ impl TestEnv {
         // Set test env vars
         #[cfg(windows)]
         set_env_var!("LOCALAPPDATA", &data_dir); // it is the same for data and config
+        #[cfg(windows)]
+        set_env_var!("TEMP", &cache_dir);
         #[cfg(not(windows))]
         set_env_var!("XDG_DATA_HOME", &data_dir);
         #[cfg(not(windows))]
         set_env_var!("XDG_CONFIG_HOME", &config_dir);
         #[cfg(not(windows))]
         set_env_var!("XDG_CACHE_HOME", &cache_dir);
+        #[cfg(not(windows))]
+        set_env_var!("SUIUP_DEFAULT_BIN_DIR", &bin_dir);
 
         // Add bin dir to PATH
         let path = env::var("PATH").unwrap_or_default();
@@ -230,6 +220,28 @@ fn copy_cached_archive(src: &Path, dst: &Path) -> Result<()> {
         std::fs::copy(src, dst)?;
     }
 
+    Ok(())
+}
+
+#[test]
+fn test_environment_paths_are_isolated() -> Result<()> {
+    let test_env = TestEnv::new()?;
+    for path in [
+        &test_env.data_dir,
+        &test_env.config_dir,
+        &test_env.cache_dir,
+        &test_env.bin_dir,
+    ] {
+        assert!(
+            path.starts_with(test_env.temp_dir.path()),
+            "Test path escapes its temporary directory: {}",
+            path.display()
+        );
+    }
+    assert_eq!(get_data_home(), test_env.data_dir);
+    assert_eq!(get_config_home(), test_env.config_dir);
+    assert_eq!(get_cache_home(), test_env.cache_dir);
+    assert_eq!(get_default_bin_dir(), test_env.bin_dir);
     Ok(())
 }
 
