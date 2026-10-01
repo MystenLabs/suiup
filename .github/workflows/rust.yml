@@ -28,6 +28,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Test release notes extraction
+        run: python -B -m unittest discover -s .github/scripts -p 'test_*.py'
+
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:

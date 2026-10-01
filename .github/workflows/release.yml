@@ -49,6 +49,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Extract release notes
+        id: release-notes
+        if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+        shell: bash
+        run: |
+          python -B .github/scripts/release_notes.py "$GITHUB_REF_NAME" Changes.md "$RUNNER_TEMP/release-notes.md"
+          echo "path=$RUNNER_TEMP/release-notes.md" >> "$GITHUB_OUTPUT"
       - name: Build binary
         uses: houseabsolute/actions-rust-cross@v1
         with:
@@ -61,3 +72,7 @@ jobs:
         with:
           executable-name: suiup
           target: ${{ matrix.platform.target }}
+          changes-file: ${{ steps.release-notes.outputs.path || 'Changes.md' }}
+          extra-files: |
+            README*
+            Changes.md
