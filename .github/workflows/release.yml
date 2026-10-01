@@ -1,6 +1,9 @@
 name: Build release binaries
 
 on:
+  push:
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       reason:
@@ -15,6 +18,8 @@ env:
 
 jobs:
   test-matrix:
+    permissions:
+      contents: write
     name: ${{ matrix.platform.os-name }} with rust ${{ matrix.toolchain }}
     runs-on: ${{ matrix.platform.runs-on }}
     strategy:
