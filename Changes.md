@@ -1,3 +1,10 @@
+## Unreleased
+
+- Fixed `suiup remove` treating directories as executables. Removal now checks for non-file paths before deleting binaries and saves completed removals even if a later deletion or default-file update fails.
+
+- Fixed `suiup remove` aborting when an installed binary is missing from disk. Removal now clears missing entries and saves the updated installed and default binary lists.
+- Changed `suiup remove` to preserve the active version and default executable. If the active version's stored file is missing, its installed entry is removed, but any existing default executable and its setting are kept.
+
 ## 0.0.14 - 2026-07-08
 
 - Reworked the `suiup update` command. It will now update only the requested binary, instead of all binaries, and it will respect
