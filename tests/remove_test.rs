@@ -193,17 +193,6 @@ fn remove_clears_stale_default_without_installed_entries() -> Result<()> {
 }
 
 #[test]
-fn remove_help_describes_active_version_protection() -> Result<()> {
-    let temp = TempDir::new()?;
-    remove_command(temp.path())
-        .arg("--help")
-        .assert()
-        .success()
-        .stdout(predicates::str::contains("preserving the active version"));
-    Ok(())
-}
-
-#[test]
 fn remove_missing_and_existing_binaries_saves_metadata() -> Result<()> {
     let temp = TempDir::new()?;
     let root = temp.path();
@@ -280,6 +269,136 @@ fn remove_all_missing_binaries_saves_empty_metadata() -> Result<()> {
         json!({ "binaries": [] })
     );
     assert_eq!(read_metadata(root, "default_version.json")?, json!({}));
+    Ok(())
+}
+
+#[test]
+fn remove_preflights_all_installed_paths_before_deleting() -> Result<()> {
+    let temp = TempDir::new()?;
+    let root = temp.path();
+    let present = root.join("present");
+    let directory = root.join("directory");
+    fs::write(&present, b"inactive sui")?;
+    fs::create_dir(&directory)?;
+    let binaries = json!([
+        sui_entry(&root.join("missing"), "testnet", "v1.0.0", false),
+        sui_entry(&present, "testnet", "v1.1.0", false),
+        sui_entry(&directory, "testnet", "v1.2.0", false),
+    ]);
+    write_metadata(root, &binaries, &json!({}))?;
+
+    remove_command(root).assert().failure();
+
+    assert_eq!(fs::read(present)?, b"inactive sui");
+    assert!(directory.is_dir());
+    assert_eq!(
+        read_metadata(root, "installed_binaries.json")?,
+        json!({ "binaries": binaries })
+    );
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn remove_preserves_file_symlinks_and_prunes_dangling_symlinks() -> Result<()> {
+    use std::os::unix::fs::symlink;
+
+    for target_exists in [true, false] {
+        let temp = TempDir::new()?;
+        let root = temp.path();
+        let target = root.join("sui-target");
+        let active = root.join("active-link");
+        if target_exists {
+            fs::write(&target, b"active sui")?;
+        }
+        fs::create_dir_all(root.join("bin"))?;
+        symlink(&target, &active)?;
+        symlink(&target, default_sui_path(root))?;
+        let binaries = json!([sui_entry(&active, "testnet", "v1.0.0", false)]);
+        let defaults = json!({ "sui": ["testnet", "v1.0.0", false] });
+        write_metadata(root, &binaries, &defaults)?;
+
+        remove_command(root).assert().success();
+
+        if target_exists {
+            assert_eq!(fs::read(active)?, b"active sui");
+            assert_eq!(fs::read(default_sui_path(root))?, b"active sui");
+            assert_eq!(
+                read_metadata(root, "installed_binaries.json")?,
+                json!({ "binaries": binaries })
+            );
+            assert_eq!(read_metadata(root, "default_version.json")?, defaults);
+        } else {
+            assert_eq!(
+                fs::symlink_metadata(active).unwrap_err().kind(),
+                std::io::ErrorKind::NotFound
+            );
+            assert_eq!(
+                fs::symlink_metadata(default_sui_path(root))
+                    .unwrap_err()
+                    .kind(),
+                std::io::ErrorKind::NotFound
+            );
+            assert_eq!(
+                read_metadata(root, "installed_binaries.json")?,
+                json!({ "binaries": [] })
+            );
+            assert_eq!(read_metadata(root, "default_version.json")?, json!({}));
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn remove_rejects_active_directory() -> Result<()> {
+    let temp = TempDir::new()?;
+    let root = temp.path();
+    let directory = root.join("active-directory");
+    fs::create_dir(&directory)?;
+    let binaries = json!([sui_entry(&directory, "testnet", "v1.0.0", false)]);
+    let defaults = json!({ "sui": ["testnet", "v1.0.0", false] });
+    write_metadata(root, &binaries, &defaults)?;
+
+    remove_command(root).assert().failure();
+
+    assert!(directory.is_dir());
+    assert_eq!(
+        read_metadata(root, "installed_binaries.json")?,
+        json!({ "binaries": binaries })
+    );
+    assert_eq!(read_metadata(root, "default_version.json")?, defaults);
+    Ok(())
+}
+
+#[test]
+fn remove_rejects_default_directory_before_deleting() -> Result<()> {
+    for active_file_exists in [false, true] {
+        let temp = TempDir::new()?;
+        let root = temp.path();
+        let active = root.join("active");
+        let inactive = root.join("inactive");
+        if active_file_exists {
+            fs::write(&active, b"active sui")?;
+        }
+        fs::write(&inactive, b"inactive sui")?;
+        fs::create_dir_all(default_sui_path(root))?;
+        let binaries = json!([
+            sui_entry(&inactive, "testnet", "v1.0.0", false),
+            sui_entry(&active, "testnet", "v1.1.0", false),
+        ]);
+        let defaults = json!({ "sui": ["testnet", "v1.1.0", false] });
+        write_metadata(root, &binaries, &defaults)?;
+
+        remove_command(root).assert().failure();
+
+        assert_eq!(fs::read(inactive)?, b"inactive sui");
+        assert!(default_sui_path(root).is_dir());
+        assert_eq!(
+            read_metadata(root, "installed_binaries.json")?,
+            json!({ "binaries": binaries })
+        );
+        assert_eq!(read_metadata(root, "default_version.json")?, defaults);
+    }
     Ok(())
 }
 
