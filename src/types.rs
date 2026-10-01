@@ -102,6 +102,11 @@ impl InstalledBinaries {
         self.binaries.retain(|b| b.binary_name != binary);
     }
 
+    /// Remove an exact installed entry from memory.
+    pub(crate) fn remove_version(&mut self, binary: &BinaryVersion) {
+        self.binaries.retain(|b| b != binary);
+    }
+
     /// List the binaries in the installed binaries JSON file
     pub fn binaries(&self) -> &[BinaryVersion] {
         &self.binaries

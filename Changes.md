@@ -1,6 +1,7 @@
 ## Unreleased
 
 - Fixed `suiup remove` aborting when an installed binary is missing from disk. Removal now clears missing entries and saves the updated installed and default binary lists.
+- Changed `suiup remove` to preserve the active version and default executable. If the active version's stored file is missing, its installed entry is removed, but any existing default executable and its setting are kept.
 
 ## 0.0.14 - 2026-07-08
 

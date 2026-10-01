@@ -8,7 +8,7 @@ use crate::handle_commands::handle_cmd;
 
 use super::ComponentCommands;
 
-/// Remove one or more binaries.
+/// Remove inactive versions of a binary, preserving the active version.
 #[derive(Args, Debug)]
 pub struct Command {
     binary: String,

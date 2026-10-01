@@ -125,9 +125,7 @@ pub enum ComponentCommands {
         #[arg(short, long, help = "Accept defaults without prompting")]
         yes: bool,
     },
-    #[command(
-        about = "Remove one. By default, the binary from each release will be removed. Use --version to specify which exact version to remove"
-    )]
+    #[command(about = "Remove inactive versions of a binary, preserving the active version")]
     Remove { binary: String },
     #[command(about = "Cleanup cache files")]
     Cleanup {

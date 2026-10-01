@@ -42,6 +42,167 @@ fn read_metadata(root: &Path, filename: &str) -> Result<Value> {
     )?)?)
 }
 
+fn sui_entry(path: &Path, network: &str, version: &str, debug: bool) -> Value {
+    json!({ "binary_name": "sui", "network_release": network,
+            "version": version, "debug": debug, "path": path })
+}
+
+fn default_sui_path(root: &Path) -> std::path::PathBuf {
+    root.join("bin")
+        .join(if cfg!(windows) { "sui.exe" } else { "sui" })
+}
+
+#[test]
+fn remove_preserves_active_network_version_and_build() -> Result<()> {
+    for (network, version, debug) in [
+        ("testnet", "v1.2.0", false),
+        ("testnet", "v1.2.0", true),
+        ("main", "nightly", false),
+    ] {
+        let temp = TempDir::new()?;
+        let root = temp.path();
+        let active_path = root.join("active");
+        fs::write(&active_path, b"active sui")?;
+        fs::create_dir_all(root.join("bin"))?;
+        fs::write(default_sui_path(root), b"default sui")?;
+        let active = sui_entry(&active_path, network, version, debug);
+        let inactive = [
+            sui_entry(&root.join("old"), network, "v1.0.0", debug),
+            sui_entry(&root.join("other-network"), "mainnet", version, debug),
+            sui_entry(&root.join("other-build"), network, version, !debug),
+        ];
+        for entry in &inactive {
+            fs::write(entry["path"].as_str().unwrap(), b"inactive sui")?;
+        }
+        let defaults = json!({ "sui": [network, version, debug] });
+        write_metadata(
+            root,
+            &json!([
+                inactive[0],
+                active,
+                inactive[1],
+                inactive[2],
+                sui_entry(&root.join("missing"), network, "v0.9.0", debug),
+            ]),
+            &defaults,
+        )?;
+
+        remove_command(root).assert().success();
+
+        assert_eq!(fs::read(&active_path)?, b"active sui");
+        assert_eq!(fs::read(default_sui_path(root))?, b"default sui");
+        for entry in &inactive {
+            assert!(!Path::new(entry["path"].as_str().unwrap()).exists());
+        }
+        assert_eq!(
+            read_metadata(root, "installed_binaries.json")?,
+            json!({ "binaries": [active] })
+        );
+        assert_eq!(read_metadata(root, "default_version.json")?, defaults);
+    }
+    Ok(())
+}
+
+#[test]
+fn remove_inactive_entry_sharing_active_path_keeps_file() -> Result<()> {
+    let temp = TempDir::new()?;
+    let root = temp.path();
+    let path = root.join("shared-sui");
+    fs::write(&path, b"active sui")?;
+    let active = sui_entry(&path, "testnet", "v1.0.0", true);
+    let inactive = sui_entry(&path, "testnet", "v1.0.0", false);
+    let defaults = json!({ "sui": ["testnet", "v1.0.0", true] });
+    write_metadata(root, &json!([inactive, active]), &defaults)?;
+
+    remove_command(root).assert().success();
+
+    assert_eq!(fs::read(&path)?, b"active sui");
+    assert_eq!(
+        read_metadata(root, "installed_binaries.json")?,
+        json!({ "binaries": [active] })
+    );
+    assert_eq!(read_metadata(root, "default_version.json")?, defaults);
+    Ok(())
+}
+
+#[test]
+fn remove_only_active_version_is_a_noop() -> Result<()> {
+    let temp = TempDir::new()?;
+    let root = temp.path();
+    let path = root.join("active-sui");
+    fs::write(&path, b"active sui")?;
+    fs::create_dir_all(root.join("bin"))?;
+    fs::write(default_sui_path(root), b"default sui")?;
+    let active = sui_entry(&path, "testnet", "v1.0.0", false);
+    let defaults = json!({ "sui": ["testnet", "v1.0.0", false] });
+    write_metadata(root, &json!([active]), &defaults)?;
+
+    for _ in 0..2 {
+        remove_command(root).assert().success();
+        assert_eq!(fs::read(&path)?, b"active sui");
+        assert_eq!(fs::read(default_sui_path(root))?, b"default sui");
+        assert_eq!(
+            read_metadata(root, "installed_binaries.json")?,
+            json!({ "binaries": [active] })
+        );
+        assert_eq!(read_metadata(root, "default_version.json")?, defaults);
+    }
+    Ok(())
+}
+
+#[test]
+fn remove_missing_active_entry_preserves_default_copy() -> Result<()> {
+    let temp = TempDir::new()?;
+    let root = temp.path();
+    fs::create_dir_all(root.join("bin"))?;
+    fs::write(default_sui_path(root), b"default sui")?;
+    let missing = sui_entry(&root.join("missing-sui"), "testnet", "v1.0.0", false);
+    let defaults = json!({ "sui": ["testnet", "v1.0.0", false] });
+    write_metadata(root, &json!([missing]), &defaults)?;
+
+    for _ in 0..2 {
+        remove_command(root).assert().success();
+        assert_eq!(fs::read(default_sui_path(root))?, b"default sui");
+        assert_eq!(
+            read_metadata(root, "installed_binaries.json")?,
+            json!({ "binaries": [] })
+        );
+        assert_eq!(read_metadata(root, "default_version.json")?, defaults);
+    }
+    Ok(())
+}
+
+#[test]
+fn remove_clears_stale_default_without_installed_entries() -> Result<()> {
+    let temp = TempDir::new()?;
+    let root = temp.path();
+    write_metadata(
+        root,
+        &json!([]),
+        &json!({ "sui": ["testnet", "v1.0.0", false] }),
+    )?;
+
+    remove_command(root).assert().success();
+
+    assert_eq!(read_metadata(root, "default_version.json")?, json!({}));
+    assert_eq!(
+        read_metadata(root, "installed_binaries.json")?,
+        json!({ "binaries": [] })
+    );
+    Ok(())
+}
+
+#[test]
+fn remove_help_describes_active_version_protection() -> Result<()> {
+    let temp = TempDir::new()?;
+    remove_command(temp.path())
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("preserving the active version"));
+    Ok(())
+}
+
 #[test]
 fn remove_missing_and_existing_binaries_saves_metadata() -> Result<()> {
     let temp = TempDir::new()?;
@@ -54,7 +215,7 @@ fn remove_missing_and_existing_binaries_saves_metadata() -> Result<()> {
     fs::write(&present, b"sui")?;
     fs::write(&walrus_path, b"walrus")?;
     fs::create_dir_all(root.join("bin"))?;
-    fs::write(root.join("bin/sui"), b"default sui")?;
+    fs::write(default_sui_path(root), b"default sui")?;
     fs::write(root.join("bin/walrus"), b"default walrus")?;
 
     let walrus = json!({
@@ -74,8 +235,7 @@ fn remove_missing_and_existing_binaries_saves_metadata() -> Result<()> {
               "version": "v1.0.0", "debug": false, "path": null },
             walrus,
         ]),
-        &json!({ "sui": ["testnet", "v1.2.0", false],
-                 "walrus": ["testnet", "v1.0.0", false] }),
+        &json!({ "walrus": ["testnet", "v1.0.0", false] }),
     )?;
 
     remove_command(root).assert().success();
@@ -89,7 +249,7 @@ fn remove_missing_and_existing_binaries_saves_metadata() -> Result<()> {
         json!({ "walrus": ["testnet", "v1.0.0", false] })
     );
     assert!(!present.exists());
-    assert!(!root.join("bin/sui").exists());
+    assert!(!default_sui_path(root).exists());
     assert_eq!(fs::read(walrus_path)?, b"walrus");
     assert_eq!(fs::read(root.join("bin/walrus"))?, b"default walrus");
     Ok(())
@@ -131,7 +291,7 @@ fn remove_reports_other_io_errors_without_dropping_metadata() -> Result<()> {
     fs::create_dir_all(&path)?;
     let binaries = json!([{ "binary_name": "sui", "network_release": "testnet",
                            "version": "v1.0.0", "debug": false, "path": path }]);
-    let defaults = json!({ "sui": ["testnet", "v1.0.0", false] });
+    let defaults = json!({});
     write_metadata(root, &binaries, &defaults)?;
 
     remove_command(root)

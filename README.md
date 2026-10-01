@@ -176,6 +176,19 @@ suiup default set sui@testnet-1.40.0 --debug # set the default version to be the
 suiup which
 ```
 
+### Remove inactive versions
+
+```bash
+suiup remove sui
+```
+
+Removal keeps the active version (including its network and debug/release build) and the default
+executable. It removes other installed versions and saves the updated list.
+
+Missing files are removed from the installed list, even if they belong to the active version. If the
+separate default executable still exists, its setting is kept. If neither copy exists, the stale
+default setting is also removed.
+
 ### Disable update warnings
 
 If you find the update warnings annoying, you can disable them:
@@ -299,7 +312,6 @@ The tool uses these environment variables to store data.
 ## Known issues
 
 - `suiup install mvr --nightly` might fail on **Windows** because of issues with compiling the `mvr-cli` crate from the repository. Just install the latest release instead.
-- `suiup remove` does not work well. Do not use it.
 
 ## Troubleshooting
 
