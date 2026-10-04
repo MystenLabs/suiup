@@ -85,7 +85,7 @@ or set the `PATH` to the `/.local/bin` (MacOS/Linux or equivalent for Windows) b
 It's recommended to read the whole quick start to familiarize yourself with the commands.
 
 > [!TIP]
-> Pass the `--yes (-y)` flag to skip confirmation prompts, thus accepting to updating the default binary to the one you are installing.
+> `suiup install` sets the newly installed version as the default binary. The `--yes (-y)` flag is no longer needed.
 
 ### Install `sui` -- this will install the latest available `testnet` release
 
