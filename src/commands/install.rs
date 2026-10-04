@@ -26,7 +26,7 @@ pub struct Command {
     #[arg(long)]
     debug: bool,
 
-    /// Accept defaults without prompting
+    /// Deprecated: an install always sets the new version as the default, so this has no effect.
     #[arg(short, long)]
     yes: bool,
 }
@@ -38,7 +38,7 @@ impl Command {
                 component: self.component.clone(),
                 nightly: self.nightly.clone(),
                 debug: self.debug,
-                yes: self.yes,
+                yes: true,
             },
             github_token,
         )

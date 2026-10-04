@@ -1,3 +1,6 @@
+## 0.1.1 - 2026-10-04
+- Make `suiup install` to set the new binary as default, so that passing `-y-` is not required anymore.
+
 ## 0.1.0 - 2026-10-01
 
 - Added support for installing the experimental `sui-fork` binary (without debug builds).
