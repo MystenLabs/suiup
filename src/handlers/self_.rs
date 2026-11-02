@@ -161,7 +161,14 @@ pub async fn handle_update() -> Result<()> {
                     archive_path.display()
                 )
             })?;
-            let outpath = temp_dir.path().join(file.name());
+            let relative = file.enclosed_name().with_context(|| {
+                format!(
+                    "Unsafe path in entry {} of zip archive {}",
+                    i,
+                    archive_path.display()
+                )
+            })?;
+            let outpath = temp_dir.path().join(relative);
 
             if file.is_dir() {
                 std::fs::create_dir_all(&outpath).with_context(|| {
